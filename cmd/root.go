@@ -37,8 +37,7 @@ var rootCmd = &cobra.Command{
 	Short: "A CLI tool that helps set up new go services.",
 	Long:  `Gogetter is a CLI tool that helps you set up new go services with a single command. It is designed to be simple and easy to use.`,
 
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
+	// example actions for root
 	// Run: func(cmd *cobra.Command, args []string) { },
 }
 
@@ -54,14 +53,12 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-	//example: rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.gogetter.yaml)")
+	// example local flags for root
+	// initRoot.Flags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.gogetter.yaml)")
+	// initRoot.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	// example: rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// example persistent flags for root
+	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.gogetter.yaml)")
 }
 
 // initConfig reads in config file and ENV variables if set.
