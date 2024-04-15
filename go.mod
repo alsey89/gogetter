@@ -1,4 +1,4 @@
-module github.com/alsey89/go-setup
+module github.com/alsey89/gogetter
 
 go 1.21.6
 
