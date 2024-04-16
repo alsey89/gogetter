@@ -41,11 +41,14 @@ type ProjectConfig struct {
 }
 
 func setUpProject() {
-	var yesNoSelection bool
+	var yesNoResponse bool
+	// var inputTextResponse string
+	// var selectOneResponse string
+	var selectManyResponse []string
 
 	// greeting message
-	yesNoSelection = selectYesNo("Welcome to the GoGetter CLI. This will begin the setup process for your new Go service. Continue?", true)
-	if !yesNoSelection {
+	yesNoResponse = selectYesNo("Welcome to the GoGetter CLI. This will begin the setup process for your new Go service. Continue?", true)
+	if !yesNoResponse {
 		fmt.Println("Project setup cancelled.")
 		return
 	}
@@ -63,7 +66,7 @@ func setUpProject() {
 
 	// project modules
 	// todo - add more modules and different options for each module
-	selectedModules := selectMultipleOptions("Select the modules you want to include in your project:", []string{
+	selectManyResponse = selectMultipleOptions("Select the modules you want to include in your project:", []string{
 		"HTTPServer: echo",
 		"Database:   postgres + gorm",
 		"Logger:     zap",
@@ -71,22 +74,22 @@ func setUpProject() {
 		"Auth: 	 	 jwt",
 		"Mailer:     gomail",
 	})
-	if len(selectedModules) == 0 {
-		yesNoSelection = selectYesNo("No modules selected. Do you want to abort setup? An empty go project will be initiated if you select 'No'", true)
-		if yesNoSelection {
+	if len(selectManyResponse) == 0 {
+		yesNoResponse = selectYesNo("No modules selected. Do you want to abort setup? An empty go project will be initiated if you select 'No'", true)
+		if yesNoResponse {
 			fmt.Println("Project setup cancelled.")
 			return
 		}
 	}
-	projectConfig.Modules = selectedModules
+	projectConfig.Modules = selectManyResponse
 
 	// git setup
-	yesNoSelection = selectYesNo("Do you want to set up git for the project?", true)
-	projectConfig.SetUpGit = yesNoSelection
+	yesNoResponse = selectYesNo("Do you want to set up git for the project?", true)
+	projectConfig.SetUpGit = yesNoResponse
 
 	// docker setup
-	yesNoSelection = selectYesNo("Do you want to set up docker for the project?", true)
-	projectConfig.SetUpDocker = yesNoSelection
+	yesNoResponse = selectYesNo("Do you want to set up docker for the project?", true)
+	projectConfig.SetUpDocker = yesNoResponse
 
 	// Step 2: Execute setup based on collected configurations
 	executeSetup(projectConfig)
@@ -108,7 +111,7 @@ func executeSetup(config *ProjectConfig) {
 	createGoModule(config.Module)
 
 	// Step 4: Create a new main.go file
-	// createMainFile(config.Modules)
+	createMainFile(config.Modules)
 
 	// Step 5: Initialize git
 	// if config.SetUpGit {
@@ -148,10 +151,7 @@ func createMainFile(modules []string) {
 	// Write the content to the main.go file
 	f.Write([]byte(`package main`))
 
-	// Add the selected modules to the main.go file
-	for _, module := range modules {
-		f.Write([]byte(fmt.Sprintf("\n\n// Module: %s", module)))
-	}
+	// todo: add the selected modules to the main.go file
 }
 
 // ----------------------------------------------------------------------------

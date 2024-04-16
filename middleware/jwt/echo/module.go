@@ -3,7 +3,9 @@ package echo_jwt
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	echojwt "github.com/labstack/echo-jwt"
 	"github.com/labstack/echo/v4"
 	"github.com/spf13/viper"
@@ -12,14 +14,22 @@ import (
 )
 
 const (
-	// defaultSecret      = "secret"
+	defaultSecret        = "secret"
 	defaultTokenLookup   = "cookie:jwt"
 	defaultSigningMethod = "HS256"
+	defaultExpInHours    = 72
 )
+
+type Config struct {
+	TokenLookup   string
+	SigningKey    string
+	SigningMethod string
+	ExpInHours    int
+}
 
 type JWT struct {
 	logger *zap.Logger
-	config *echojwt.Config
+	config *Config
 
 	scope      string
 	middleware echo.MiddlewareFunc
@@ -39,11 +49,15 @@ func InitiateModule(scope string) fx.Option {
 			logger := p.Logger.Named("[" + scope + "]")
 			config := loadConfig(scope)
 
-			middleware := echojwt.WithConfig(config)
+			middleware := echojwt.WithConfig(echojwt.Config{
+				SigningKey:    config.SigningKey,
+				SigningMethod: config.SigningMethod,
+				TokenLookup:   config.TokenLookup,
+			})
 
 			j := &JWT{
 				logger:     logger,
-				config:     &config,
+				config:     config,
 				scope:      scope,
 				middleware: middleware,
 			}
@@ -61,20 +75,22 @@ func InitiateModule(scope string) fx.Option {
 	)
 }
 
-func loadConfig(scope string) echojwt.Config {
+func loadConfig(scope string) *Config {
 	getConfigPath := func(key string) string {
 		return fmt.Sprintf("%s.%s", scope, key)
 	}
 
 	//set defaults
 	viper.SetDefault(getConfigPath("token_lookup"), defaultTokenLookup)
-	viper.SetDefault(getConfigPath("signing_key"), scope) //* default key is the scope
+	viper.SetDefault(getConfigPath("signing_key"), fmt.Sprintf("%s_%s", scope, defaultSecret)) //* default key is scope_secret
 	viper.SetDefault(getConfigPath("signing_method"), defaultSigningMethod)
+	viper.SetDefault(getConfigPath("exp_in_hours"), defaultExpInHours)
 
-	return echojwt.Config{
+	return &Config{
 		TokenLookup:   viper.GetString(getConfigPath("token_lookup")),
 		SigningKey:    viper.GetString(getConfigPath("signing_key")),
 		SigningMethod: viper.GetString(getConfigPath("signing_method")),
+		ExpInHours:    viper.GetInt(getConfigPath("exp_in_hours")),
 	}
 }
 
@@ -100,4 +116,25 @@ func (j *JWT) PrintDebugLogs() {
 	j.logger.Debug("TokenLookup", zap.String("TokenLookup", j.config.TokenLookup))
 	j.logger.Debug("SigningKey", zap.Any("SigningKey", j.config.SigningKey))
 	j.logger.Debug("SigningMethod", zap.String("SigningMethod", j.config.SigningMethod))
+}
+
+// ------------------------------------------------------------
+
+func (j *JWT) GenerateToken(additionalClaims jwt.MapClaims) (*string, error) {
+
+	claims := jwt.MapClaims{
+		"exp": jwt.NewNumericDate(time.Now().Add(time.Hour * time.Duration(j.config.ExpInHours))),
+	}
+
+	for key, value := range additionalClaims {
+		claims[key] = value
+	}
+
+	token := jwt.NewWithClaims(jwt.GetSigningMethod(j.config.SigningMethod), claims)
+	t, err := token.SignedString([]byte(j.config.SigningKey))
+	if err != nil {
+		j.logger.Error("Failed to generate token", zap.Error(err))
+		return nil, err
+	}
+	return &t, nil
 }
