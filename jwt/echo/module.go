@@ -42,6 +42,8 @@ type Params struct {
 	Lifecycle fx.Lifecycle
 }
 
+// InitiateModule initializes the JWT middleware with the provided scope.
+// CONFIG --> scope.token_lookup, scope.signing_key, scope.signing_method, scope.exp_in_hours
 func InitiateModule(scope string) fx.Option {
 	return fx.Module(
 		scope,
@@ -50,9 +52,13 @@ func InitiateModule(scope string) fx.Option {
 			config := loadConfig(scope)
 
 			middleware := echojwt.WithConfig(echojwt.Config{
-				SigningKey:    config.SigningKey,
+				SigningKey:    []byte(config.SigningKey),
 				SigningMethod: config.SigningMethod,
 				TokenLookup:   config.TokenLookup,
+				ErrorHandler: func(c echo.Context, err error) error {
+					logger.Error("JWT Middleware Error", zap.Error(err))
+					return err
+				},
 			})
 
 			j := &JWT{
@@ -82,7 +88,7 @@ func loadConfig(scope string) *Config {
 
 	//set defaults
 	viper.SetDefault(getConfigPath("token_lookup"), defaultTokenLookup)
-	viper.SetDefault(getConfigPath("signing_key"), fmt.Sprintf("%s_%s", scope, defaultSecret)) //* default key is scope_secret
+	viper.SetDefault(getConfigPath("signing_key"), defaultSecret)
 	viper.SetDefault(getConfigPath("signing_method"), defaultSigningMethod)
 	viper.SetDefault(getConfigPath("exp_in_hours"), defaultExpInHours)
 
@@ -107,9 +113,7 @@ func (j *JWT) onStop(ctx context.Context) error {
 	return nil
 }
 
-func (j *JWT) Middleware() echo.MiddlewareFunc {
-	return j.middleware
-}
+//! ------------------------------------------------------------
 
 func (j *JWT) PrintDebugLogs() {
 	j.logger.Debug("----- JWT Middleware Configuration -----")
@@ -118,8 +122,15 @@ func (j *JWT) PrintDebugLogs() {
 	j.logger.Debug("SigningMethod", zap.String("SigningMethod", j.config.SigningMethod))
 }
 
-// ------------------------------------------------------------
+// Middleware returns the echo.MiddlewareFunc for JWT authentication.
+func (j *JWT) Middleware() echo.MiddlewareFunc {
+	return j.middleware
+}
 
+// GenerateToken generates a JWT token with the provided additional claims.
+// It takes additionalClaims as input, which is a map of custom claims to be added to the token.
+// SigningKey, SigningMethod, and ExpInHours are taken from the config keys scope.signing_key, scope.signing_method, and scope.exp_in_hours respectively.
+// The function returns a pointer to the generated token string and an error, if any.
 func (j *JWT) GenerateToken(additionalClaims jwt.MapClaims) (*string, error) {
 
 	claims := jwt.MapClaims{
