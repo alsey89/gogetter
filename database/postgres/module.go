@@ -19,7 +19,7 @@ const (
 	DefaultUser        = "postgres"
 	DefaultPassword    = "password"
 	DefaultSSLMode     = "allow"
-	DefaultLogLevel    = gorm_logger.Error
+	DefaultLogLevel    = "info"
 	DefaultAutoMigrate = false
 )
 
@@ -30,7 +30,7 @@ type Config struct {
 	User        string
 	Password    string
 	SSLMode     string
-	LogLevel    gorm_logger.LogLevel
+	LogLevel    string
 	AutoMigrate bool
 }
 
@@ -56,14 +56,15 @@ func InitiateModule(scope string) fx.Option {
 			logger := p.Logger.Named("[" + scope + "]")
 			config := loadConfig(scope)
 
-			db := setupDatabaseOrFatal(config, logger)
-
 			database := &Database{
 				logger: logger,
-				db:     db,
 				config: config,
 				scope:  scope,
 			}
+
+			db := database.setUpDBConnectionOrFatal()
+
+			database.db = db
 
 			return database, nil
 		}),
@@ -76,48 +77,6 @@ func InitiateModule(scope string) fx.Option {
 			)
 		}),
 	)
-}
-
-func loadConfig(scope string) *Config {
-	getConfigPath := func(key string) string {
-		return fmt.Sprintf("%s.%s", scope, key)
-	}
-
-	//set default values
-	viper.SetDefault(getConfigPath("%s.host"), DefaultHost)
-	viper.SetDefault(getConfigPath("%s.port"), DefaultPort)
-	viper.SetDefault(getConfigPath("%s.dbname"), DefaultDbName)
-	viper.SetDefault(getConfigPath("%s.user"), DefaultUser)
-	viper.SetDefault(getConfigPath("%s.password"), DefaultPassword)
-	viper.SetDefault(getConfigPath("%s.sslmode"), DefaultSSLMode)
-	viper.SetDefault(getConfigPath("%s.log_level"), DefaultLogLevel)
-	viper.SetDefault(getConfigPath("%s.autoMigrate"), DefaultAutoMigrate)
-
-	return &Config{
-		Host:        viper.GetString(getConfigPath("host")),
-		Port:        viper.GetInt(getConfigPath("port")),
-		DBName:      viper.GetString(getConfigPath("dbname")),
-		User:        viper.GetString(getConfigPath("user")),
-		Password:    viper.GetString(getConfigPath("password")),
-		SSLMode:     viper.GetString(getConfigPath("sslmode")),
-		LogLevel:    gorm_logger.Info,
-		AutoMigrate: viper.GetBool(getConfigPath("autoMigrate")),
-	}
-}
-
-func setupDatabaseOrFatal(config *Config, logger *zap.Logger) *gorm.DB {
-	connectionString := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		config.Host, config.Port, config.User, config.Password, config.DBName, config.SSLMode)
-	gormConfig := &gorm.Config{
-		Logger: gorm_logger.Default.LogMode(config.LogLevel),
-	}
-
-	db, err := gorm.Open(postgres.Open(connectionString), gormConfig)
-	if err != nil {
-		logger.Fatal("Failed to connect to database", zap.Error(err))
-	}
-
-	return db
 }
 
 func (d *Database) onStart(context.Context) error {
@@ -144,8 +103,64 @@ func (d *Database) onStop(context.Context) error {
 	return nil
 }
 
-func (d *Database) GetDB() *gorm.DB {
-	return d.db
+// ---------------------------------------------------------
+
+func loadConfig(scope string) *Config {
+	getConfigPath := func(key string) string {
+		return fmt.Sprintf("%s.%s", scope, key)
+	}
+
+	//set default values
+	viper.SetDefault(getConfigPath("host"), DefaultHost)
+	viper.SetDefault(getConfigPath("port"), DefaultPort)
+	viper.SetDefault(getConfigPath("dbname"), DefaultDbName)
+	viper.SetDefault(getConfigPath("user"), DefaultUser)
+	viper.SetDefault(getConfigPath("password"), DefaultPassword)
+	viper.SetDefault(getConfigPath("sslmode"), DefaultSSLMode)
+	viper.SetDefault(getConfigPath("log_level"), DefaultLogLevel)
+	viper.SetDefault(getConfigPath("auto_migrate"), DefaultAutoMigrate)
+
+	return &Config{
+		Host:        viper.GetString(getConfigPath("host")),
+		Port:        viper.GetInt(getConfigPath("port")),
+		DBName:      viper.GetString(getConfigPath("dbname")),
+		User:        viper.GetString(getConfigPath("user")),
+		Password:    viper.GetString(getConfigPath("password")),
+		SSLMode:     viper.GetString(getConfigPath("sslmode")),
+		LogLevel:    viper.GetString(getConfigPath("log_level")),
+		AutoMigrate: viper.GetBool(getConfigPath("auto_migrate")),
+	}
+}
+
+func (d *Database) setUpDBConnectionOrFatal() *gorm.DB {
+	dsn := d.getConnectionStringFromConfig()
+	loglevel := d.getLogLevelFromConfig()
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: gorm_logger.Default.LogMode(loglevel),
+	})
+	if err != nil {
+		d.logger.Fatal("Error connecting to database", zap.Error(err))
+	}
+
+	return db
+}
+func (d *Database) getConnectionStringFromConfig() string {
+	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		d.config.Host, d.config.Port, d.config.User, d.config.Password, d.config.DBName, d.config.SSLMode)
+}
+func (d *Database) getLogLevelFromConfig() gorm_logger.LogLevel {
+	switch d.config.LogLevel {
+	case "silent":
+		return gorm_logger.Silent
+	case "error":
+		return gorm_logger.Error
+	case "warn":
+		return gorm_logger.Warn
+	case "info":
+		return gorm_logger.Info
+	default:
+		return gorm_logger.Info
+	}
 }
 
 func (d *Database) printDebugLogs() {
@@ -166,4 +181,9 @@ func (d *Database) AutoMigrate(models []interface{}) {
 			d.logger.Error("Error auto migrating database", zap.Error(err))
 		}
 	}
+}
+
+// GETTERS ---------------------------------------------------------
+func (d *Database) GetDB() *gorm.DB {
+	return d.db
 }
