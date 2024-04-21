@@ -1,9 +1,10 @@
-package zap_module
+package zap_logger
 
 import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/viper"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -72,7 +73,7 @@ func setupLevel() zap.AtomicLevel {
 
 	logLevel := defaultLogLevel
 
-	switch os.Getenv("LOG_LEVEL") {
+	switch viper.GetString("system.loglevel") {
 	case zap.DebugLevel.String():
 		logLevel = zap.DebugLevel
 	case zap.InfoLevel.String():

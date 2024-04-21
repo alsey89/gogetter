@@ -11,8 +11,7 @@ import (
 
 func TestNewConfigNoPrefix(t *testing.T) {
 	prefix := ""
-	printDebugLogs := false
-	config := SetUpConfig(prefix, "yaml", printDebugLogs)
+	config := SetUpConfig(prefix, "yaml")
 
 	// Assert that prefix is not set
 	assert.Equal(t, "", viper.GetEnvPrefix())
@@ -25,8 +24,7 @@ func TestNewConfigNoPrefix(t *testing.T) {
 
 func TestNewConfigWithPrefix(t *testing.T) {
 	prefix := "test"
-	printDebugLogs := false
-	config := SetUpConfig(prefix, "yaml", printDebugLogs)
+	config := SetUpConfig(prefix, "yaml")
 
 	// Assert that prefix is set
 	assert.Equal(t, "test", viper.GetEnvPrefix())

@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"embed"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
+	"text/template"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
@@ -33,100 +35,87 @@ func init() {
 // ----------------------------------------------------------------------------
 
 type ProjectConfig struct {
-	Module      string
-	Path        string
-	Modules     []string
-	SetUpGit    bool
-	SetUpDocker bool
+	Module string
+	Path   string
+	// mandatory modules
+	IncludeLogger     bool
+	IncludeConfig     bool
+	IncludeHTTPServer bool
+	// optional modules
+	IncludeJWTMiddleware bool
+	IncludeDBConnector   bool
+	IncludeMailer        bool
+
+	SetUpGit        bool
+	SetUpDockerFile bool
+
+	// todo add project specific modules
 }
 
 func setUpProject() {
-	var yesNoResponse bool
-	// var inputTextResponse string
-	// var selectOneResponse string
-	var selectManyResponse []string
-
 	// greeting message
-	yesNoResponse = selectYesNo("Welcome to the GoGetter CLI. This will begin the setup process for your new Go service. Continue?", true)
-	if !yesNoResponse {
+	if !selectYesNo("Welcome to the GoGetter CLI. This will begin the setup process for your new Go service. Continue?", true) {
 		fmt.Println("Project setup cancelled.")
 		return
 	}
 
 	//* Collect Project Configurations
-	projectConfig := &ProjectConfig{}
+	projectConfig := &ProjectConfig{
+		IncludeLogger:     true,
+		IncludeConfig:     true,
+		IncludeHTTPServer: true,
+	}
 
 	// project name
-	moduleName := inputText("Enter the go module name for your project. [Example: github.com/alsey89/gogetter]", true)
-	projectConfig.Module = moduleName
+	projectConfig.Module = inputText("Enter the go module name for your project. [Example: github.com/alsey89/gogetter]", true)
 
 	// project directory
-	path := inputText("Enter the path for your project. Service will be initiated at the current directory if left empty.", true)
-	projectConfig.Path = path
+	projectConfig.Path = inputText("Enter the path for your project. Service will be initiated at the current directory if left empty.", false)
 
 	// project modules
-	// todo - add more modules and different options for each module
-	selectManyResponse = selectMultipleOptions("Select the modules you want to include in your project:", []string{
-		"HTTPServer: echo",
-		"Database:   postgres + gorm",
-		"Logger:     zap",
-		"Config:     viper",
-		"Auth: 	 	 jwt",
-		"Mailer:     gomail",
-	})
-	if len(selectManyResponse) == 0 {
-		yesNoResponse = selectYesNo("No modules selected. Do you want to abort setup? An empty go project will be initiated if you select 'No'", true)
-		if yesNoResponse {
-			fmt.Println("Project setup cancelled.")
-			return
-		}
-	}
-	projectConfig.Modules = selectManyResponse
+	projectConfig.IncludeJWTMiddleware = selectYesNo("Do you want to include a JWT middleware module?", true)
+	projectConfig.IncludeDBConnector = selectYesNo("Do you want to include a database module with Postgres and GORM?", true)
+	projectConfig.IncludeMailer = selectYesNo("Do you want to include a mailer module using Gomail?", true)
 
 	// git setup
-	yesNoResponse = selectYesNo("Do you want to set up git for the project?", true)
-	projectConfig.SetUpGit = yesNoResponse
-
+	projectConfig.SetUpGit = selectYesNo("Do you want to set up git for the project?", true)
 	// docker setup
-	yesNoResponse = selectYesNo("Do you want to set up docker for the project?", true)
-	projectConfig.SetUpDocker = yesNoResponse
+	projectConfig.SetUpDockerFile = selectYesNo("Do you want to set up docker for the project?", true)
 
-	// Step 2: Execute setup based on collected configurations
 	executeSetup(projectConfig)
 }
 
 func executeSetup(config *ProjectConfig) {
-	// Step 1: Create a new directory with the project name if path is not empty or "."
-	if config.Path != "" && config.Path != "." {
-		err := os.MkdirAll(config.Path, os.ModePerm)
+	var err error
+
+	err = createGoModule(config.Module)
+	if err != nil {
+		log.Fatalf("Error creating Go module: %v", err)
+	}
+
+	err = createMainFile(config)
+	if err != nil {
+		log.Fatalf("Error creating main file: %v", err)
+	}
+
+	if config.SetUpDockerFile {
+		err = createDockerfile(false)
 		if err != nil {
-			log.Fatalf("Error creating project directory: %v", err)
+			log.Fatalf("Error creating Dockerfile: %v", err)
 		}
 	}
 
-	// Step 2: Change directory to the project directory
-	os.Chdir(config.Path)
-
-	// Step 3: Create a new Go module
-	createGoModule(config.Module)
-
-	// Step 4: Create a new main.go file
-	createMainFile(config.Modules)
-
-	// Step 5: Initialize git
-	// if config.SetUpGit {
-	// 	initializeGit()
-	// }
-
-	// Step 6: Initialize docker
-	// if config.SetUpDocker {
-	// 	initializeDocker()
-	// }
+	if config.SetUpGit {
+		err = createGitRepository()
+		if err != nil {
+			log.Fatalf("Error creating Git repository: %v", err)
+		}
+	}
 }
 
-func createGoModule(name string) {
+func createGoModule(name string) error {
 	// Create a new Go module
-	fmt.Printf("Creating a new Go module: %s\n", name)
+	log.Printf("Creating a new Go module: %s\n", name)
 
 	// run go mod init <name>
 	cmd := exec.Command("go", "mod", "init", name)
@@ -134,24 +123,115 @@ func createGoModule(name string) {
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
 	if err != nil {
-		log.Fatalf("Error creating Go module: %v", err)
+		return err
 	}
+	return nil
 }
 
-func createMainFile(modules []string) {
-	// Create a new main.go file
-	fmt.Println("Creating a new main.go file")
+//go:embed templates/*
+var templateFS embed.FS
 
-	// Create a new main.go file
-	f, err := os.Create("main.go")
+func createMainFile(projectConfig *ProjectConfig) error {
+	// Using the embedded file system to access the template
+	tmpl, err := template.ParseFS(templateFS, "templates/main.go.tpl")
 	if err != nil {
-		log.Fatalf("Error creating main.go file: %v", err)
+		log.Printf("Failed to parse template: %v", err)
+		return err
 	}
 
-	// Write the content to the main.go file
-	f.Write([]byte(`package main`))
+	file, err := os.Create("main.go")
+	if err != nil {
+		log.Printf("Failed to create file: %v", err)
+		return err
+	}
+	defer file.Close()
 
-	// todo: add the selected modules to the main.go file
+	// Execute the template with the project configuration
+	if err := tmpl.Execute(file, projectConfig); err != nil {
+		log.Printf("Failed to execute template: %v", err)
+		return err
+	}
+
+	// run go mod init <name>
+	cmd := exec.Command("go", "mod", "tidy")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createDockerfile(forDevelopment bool) error {
+	var templatePath string
+	var dockerfileName string
+
+	if forDevelopment {
+		templatePath = "templates/Dockerfile.dev.tpl"
+		dockerfileName = "Dockerfile.dev"
+	} else {
+		templatePath = "templates/Dockerfile.tpl"
+		dockerfileName = "Dockerfile"
+	}
+
+	// Using the embedded file system to access the template
+	tmpl, err := template.ParseFS(templateFS, templatePath)
+	if err != nil {
+		log.Printf("Failed to parse template: %v", err)
+		return err
+	}
+
+	file, err := os.Create(dockerfileName)
+	if err != nil {
+		log.Printf("Failed to create file: %v", err)
+		return err
+	}
+	defer file.Close()
+
+	// Execute the template with the project configuration
+	if err := tmpl.Execute(file, nil); err != nil {
+		log.Printf("Failed to execute template: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func createGitRepository() error {
+	// Create a new Git repository
+	log.Printf("Creating a new Git repository\n")
+
+	// run git init
+	cmd := exec.Command("git", "init")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		return err
+	}
+
+	// create .gitignore file
+	file, err := os.Create(".gitignore")
+	if err != nil {
+		log.Printf("Failed to create file: %v", err)
+		return err
+	}
+	defer file.Close()
+
+	tmpl, err := template.ParseFS(templateFS, "templates/gitignore.tpl")
+	if err != nil {
+		log.Printf("Failed to parse template: %v", err)
+		return err
+	}
+
+	if err := tmpl.Execute(file, nil); err != nil {
+		log.Printf("Failed to execute template: %v", err)
+		return err
+	}
+
+	return nil
 }
 
 // ----------------------------------------------------------------------------

@@ -17,9 +17,10 @@ const (
 var defaultConfigFilePaths = []string{"./", "./configs"}
 
 type Config struct {
+	loglevel string
 }
 
-func SetUpConfig(prefix string, configFileType string, printDebugLogs bool) *Config {
+func SetUpConfig(prefix string, configFileType string) *Config {
 	//environmental variables
 	if prefix != "" {
 		viper.SetEnvPrefix(prefix)
@@ -38,9 +39,11 @@ func SetUpConfig(prefix string, configFileType string, printDebugLogs bool) *Con
 
 	readConfigWithOptionalOverride("config", "config.override", validatedConfigFileType)
 
-	config := &Config{}
+	config := &Config{
+		loglevel: viper.GetString("system.loglevel"),
+	}
 
-	if printDebugLogs {
+	if config.loglevel == "debug" {
 		config.PrintDebugLogs(prefix, validatedConfigFileType)
 	}
 
@@ -55,7 +58,7 @@ func readConfigWithOptionalOverride(baseConfig string, overrideConfig string, co
 	//check for presence of config files
 	_, err := os.Stat(baseConfig + "." + configFileType)
 	if err != nil {
-		log.Printf("%s.%s not found. No config file loaded.", baseConfig, configFileType)
+		log.Printf("Base config -- %s.%s -- not found.", baseConfig, configFileType)
 		return
 	}
 
@@ -63,15 +66,15 @@ func readConfigWithOptionalOverride(baseConfig string, overrideConfig string, co
 	viper.SetConfigName(baseConfig)
 	err = viper.ReadInConfig()
 	if err != nil {
-		log.Printf("Error reading base config file, %s. No config file loaded.", err)
+		log.Printf("Error reading base config file, %s.", err)
 	} else {
-		log.Printf("Base config applied: %s\n", viper.ConfigFileUsed())
+		log.Printf("Base config applied from -- %s\n --", viper.ConfigFileUsed())
 	}
 
 	// check for presence of override config file
 	_, err = os.Stat(overrideConfig + "." + configFileType)
 	if err != nil {
-		log.Printf("%s.%s not found. No override configuration loaded.", overrideConfig, configFileType)
+		log.Printf("Override config -- %s.%s -- not found.", overrideConfig, configFileType)
 		return
 	}
 
@@ -79,9 +82,9 @@ func readConfigWithOptionalOverride(baseConfig string, overrideConfig string, co
 	viper.SetConfigName(overrideConfig)
 	err = viper.MergeInConfig()
 	if err != nil {
-		log.Printf("Error reading override config file, %s. No override configuration loaded.", err)
+		log.Printf("Error reading override config file, %s.", err)
 	} else {
-		log.Printf("Override config applied: %s\n", viper.ConfigFileUsed())
+		log.Printf("Override config applied from -- %s\n --", viper.ConfigFileUsed())
 	}
 }
 
@@ -110,7 +113,7 @@ func (c *Config) PrintDebugLogs(prefix string, configFileType string) {
 	log.Printf("|| Prefix   %s", prefix)
 	log.Printf("|| replacer %s", ". -> _")
 	log.Printf("|| autoEnv  %s", "true")
-	log.Printf("|| name     %s", "config OR config.override")
+	log.Printf("|| name     %s", "config AND config.override[OPTIONAL]")
 	log.Printf("|| paths    %s", defaultConfigFilePaths)
 	log.Printf("|| fileType %s", configFileType)
 	log.Println("------------------------")
@@ -126,4 +129,9 @@ func (c *Config) SetFallbackConfigs(configs map[string]interface{}) {
 			viper.Set(k, v)
 		}
 	}
+}
+
+func SetSystemLogLevel(level string) {
+	lowerCaseLevel := strings.ToLower(level)
+	viper.Set("system.loglevel", lowerCaseLevel)
 }
