@@ -37,6 +37,7 @@ type Config struct {
 type Database struct {
 	logger *zap.Logger
 	config *Config
+	schema []interface{}
 
 	scope string
 	db    *gorm.DB
@@ -49,7 +50,7 @@ type Params struct {
 	Logger    *zap.Logger
 }
 
-func InitiateModule(scope string) fx.Option {
+func InitiateModuleAndSchema(scope string, schema ...interface{}) fx.Option {
 	return fx.Module(
 		scope,
 		fx.Provide(func(p Params) (*Database, error) {
@@ -60,6 +61,7 @@ func InitiateModule(scope string) fx.Option {
 				logger: logger,
 				config: config,
 				scope:  scope,
+				schema: schema,
 			}
 
 			db := database.setUpDBConnectionOrFatal()
@@ -81,9 +83,11 @@ func InitiateModule(scope string) fx.Option {
 
 func (d *Database) onStart(context.Context) error {
 	d.logger.Info("Database initiated")
+	if d.config.AutoMigrate {
+		d.Migrate(d.schema...)
+	}
 
 	d.printDebugLogs()
-
 	return nil
 }
 
@@ -173,13 +177,11 @@ func (d *Database) printDebugLogs() {
 	d.logger.Debug("SSLMode", zap.String("sslmode", d.config.SSLMode))
 }
 
-func (d *Database) AutoMigrate(models []interface{}) {
-	if d.config.AutoMigrate {
-		d.logger.Info("Auto migrating database")
-		err := d.db.AutoMigrate(models)
-		if err != nil {
-			d.logger.Error("Error auto migrating database", zap.Error(err))
-		}
+func (d *Database) Migrate(schema ...interface{}) {
+	d.logger.Info("Auto migrating database")
+	err := d.db.AutoMigrate(schema...)
+	if err != nil {
+		d.logger.Error("Error auto migrating database", zap.Error(err))
 	}
 }
 

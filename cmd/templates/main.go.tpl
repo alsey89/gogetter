@@ -52,16 +52,26 @@ func main() {
 	app := fx.New(
 		fx.Supply(configuration),
 		logger.InitiateModule(),
-		server.InitiateModule("server"),
+		{{- if .IncludeDBConnector }}
+
+		postgres.InitiateModuleAndSchema(
+			"database",
+			// ...schema,
+			// example: &User{},
+			// example: &Post{},
+			// example: &Comment{},
+		),
+		{{- end }}
 		{{- if .IncludeJWTMiddleware }}
+
 		jwt.InitiateModule("auth_jwt"),
 		{{- end }}
-		{{- if .IncludeDBConnector }}
-		postgres.InitiateModule("database"),
-		{{- end }}
 		{{- if .IncludeMailer }}
+		
 		mailer.InitiateModule("mailer"),
 		{{- end }}
+
+		server.InitiateModule("server"),
 		fx.NopLogger,
 	)
 	app.Run()
