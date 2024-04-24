@@ -2,6 +2,7 @@ package main
 
 import (
 	"go.uber.org/fx"
+
 	config "github.com/alsey89/gogetter/config/viper"
 	logger "github.com/alsey89/gogetter/logging/zap"
 	server "github.com/alsey89/gogetter/server/echo"
@@ -10,7 +11,7 @@ import (
 	{{ if .IncludeMailer }}mailer "github.com/alsey89/gogetter/mail/gomail" {{ end }}
 )
 
-var configuration *viper.Config
+var configuration *config.Config
 
 func init() {
 	config.SetSystemLogLevel("debug")
@@ -67,7 +68,7 @@ func main() {
 		jwt.InitiateModule("auth_jwt"),
 		{{- end }}
 		{{- if .IncludeMailer }}
-		
+
 		mailer.InitiateModule("mailer"),
 		{{- end }}
 
