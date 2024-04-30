@@ -1,4 +1,4 @@
-package gomail_mailer
+package mailer
 
 import (
 	"context"
@@ -17,10 +17,10 @@ const (
 	DefaultAppPassword = ""
 	DefaultTLS         = false
 
-	DefaultSubject = "From HRMS"
-	DefaultBody    = "This is an email from HRMS."
-	DefaultFrom    = "hrms@hrms.com"
-	DefaultTo      = "hrms@hrms.com"
+	DefaultSubject = "From Gogetter Mail Module"
+	DefaultBody    = "This is an email from Gogetter Mail Module."
+	DefaultFrom    = "mail@gogetter.com"
+	DefaultTo      = "mail@gogetter.com"
 )
 
 type Config struct {

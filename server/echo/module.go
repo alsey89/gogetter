@@ -1,4 +1,4 @@
-package echo_module
+package echo
 
 import (
 	"context"

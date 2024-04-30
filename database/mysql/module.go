@@ -7,18 +7,18 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"gorm.io/driver/postgres"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	gorm_logger "gorm.io/gorm/logger"
 )
 
 const (
 	DefaultHost        = "0.0.0.0"
-	DefaultPort        = 5432
-	DefaultDbName      = "postgres"
-	DefaultUser        = "postgres"
+	DefaultPort        = 3306
+	DefaultDbName      = "mysql"
+	DefaultUser        = "root"
 	DefaultPassword    = "password"
-	DefaultSSLMode     = "allow"
+	DefaultSSLMode     = "true"
 	DefaultLogLevel    = "info"
 	DefaultAutoMigrate = false
 )
@@ -107,14 +107,11 @@ func (d *Database) onStop(context.Context) error {
 	return nil
 }
 
-// ---------------------------------------------------------
-
 func loadConfig(scope string) *Config {
 	getConfigPath := func(key string) string {
 		return fmt.Sprintf("%s.%s", scope, key)
 	}
 
-	//set default values
 	viper.SetDefault(getConfigPath("host"), DefaultHost)
 	viper.SetDefault(getConfigPath("port"), DefaultPort)
 	viper.SetDefault(getConfigPath("dbname"), DefaultDbName)
@@ -139,7 +136,7 @@ func loadConfig(scope string) *Config {
 func (d *Database) setUpDBConnectionOrFatal() *gorm.DB {
 	dsn := d.getConnectionStringFromConfig()
 	loglevel := d.getLogLevelFromConfig()
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		Logger: gorm_logger.Default.LogMode(loglevel),
 	})
 	if err != nil {
@@ -148,10 +145,12 @@ func (d *Database) setUpDBConnectionOrFatal() *gorm.DB {
 
 	return db
 }
+
 func (d *Database) getConnectionStringFromConfig() string {
-	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		d.config.Host, d.config.Port, d.config.User, d.config.Password, d.config.DBName, d.config.SSLMode)
+	return fmt.Sprintf("root:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		d.config.Password, d.config.Host, d.config.Port, d.config.DBName)
 }
+
 func (d *Database) getLogLevelFromConfig() gorm_logger.LogLevel {
 	switch d.config.LogLevel {
 	case "silent":

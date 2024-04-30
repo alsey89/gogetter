@@ -1,4 +1,4 @@
-package viper_config
+package config
 
 import (
 	"log"

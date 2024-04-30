@@ -1,4 +1,4 @@
-package echo_jwt
+package jwt
 
 import (
 	"context"

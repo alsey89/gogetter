@@ -1,5 +1,5 @@
 // file: jwt/echo/module_test.go
-package echo_jwt
+package jwt
 
 import (
 	"context"
