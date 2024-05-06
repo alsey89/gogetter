@@ -16,18 +16,22 @@ import (
 )
 
 const (
-	DefaultHost     = "0.0.0.0"
-	DefaultLogLevel = "DEV"
-	DefaultPort     = 3001
+	DefaultHost           = "0.0.0.0"
+	DefaultLogLevel       = "DEV"
+	DefaultPort           = 3001
+	DefaultCSRFProtection = false
+	DefaultCSRFSecure     = false
 )
 
 type Config struct {
-	AllowHeaders string
-	AllowMethods string
-	AllowOrigins string
-	Host         string
-	LogLevel     string
-	Port         int
+	AllowHeaders   string
+	AllowMethods   string
+	AllowOrigins   string
+	CSRFProtection bool
+	CSRFSecure     bool
+	Host           string
+	LogLevel       string
+	Port           int
 }
 
 type HTTPServer struct {
@@ -79,6 +83,9 @@ func loadConfig(scope string) *Config {
 	viper.SetDefault(fmt.Sprintf("%s.allow_methods", scope), "GET,PUT,POST,DELETE")
 	viper.SetDefault(fmt.Sprintf("%s.allow_origins", scope), "*")
 
+	viper.SetDefault(fmt.Sprintf("%s.csrf_protection", scope), DefaultCSRFProtection)
+	viper.SetDefault(fmt.Sprintf("%s.csrf_secure", scope), DefaultCSRFSecure)
+
 	viper.SetDefault(fmt.Sprintf("%s.host", scope), DefaultHost)
 	viper.SetDefault(fmt.Sprintf("%s.log_level", scope), DefaultLogLevel)
 	viper.SetDefault(fmt.Sprintf("%s.port", scope), DefaultPort)
@@ -91,15 +98,20 @@ func loadConfig(scope string) *Config {
 		AllowHeaders: viper.GetString(getConfigPath("allow_headers")),
 		AllowMethods: viper.GetString(getConfigPath("allow_methods")),
 		AllowOrigins: viper.GetString(getConfigPath("allow_origins")),
-		Host:         viper.GetString(getConfigPath("host")),
-		LogLevel:     viper.GetString(getConfigPath("log_level")),
-		Port:         viper.GetInt(getConfigPath("port")),
+
+		CSRFProtection: viper.GetBool(getConfigPath("csrf_protection")),
+		CSRFSecure:     viper.GetBool(getConfigPath("csrf_secure")),
+
+		Host:     viper.GetString(getConfigPath("host")),
+		Port:     viper.GetInt(getConfigPath("port")),
+		LogLevel: viper.GetString(getConfigPath("log_level")),
 	}
 }
 
 func (s *HTTPServer) onStart(ctx context.Context) error {
 	s.logger.Info("HTTPServer initiated")
 
+	s.setUpCSRFMiddleware()
 	s.setUpCorsMiddleware()
 	s.setUpRequestLoggerMiddleware()
 
@@ -121,6 +133,22 @@ func (s *HTTPServer) onStop(context.Context) error {
 
 	s.logger.Info("HTTPServer stopped")
 	return nil
+}
+
+func (s *HTTPServer) setUpCSRFMiddleware() {
+	if !s.config.CSRFProtection {
+		return
+	}
+
+	csrfConfig := middleware.CSRFConfig{
+		TokenLength:    32,
+		TokenLookup:    "header:X-CSRF-Token",
+		CookieName:     "csrf",
+		CookiePath:     "/",
+		CookieSecure:   false,
+		CookieHTTPOnly: true,
+	}
+	s.server.Use(middleware.CSRFWithConfig(csrfConfig))
 }
 
 func (s *HTTPServer) setUpCorsMiddleware() {
@@ -226,6 +254,17 @@ func (s *HTTPServer) PrintDebugLogs() {
 	s.logger.Debug("----- Server Configuration -----")
 	s.logger.Debug("Host", zap.String("Host", s.config.Host))
 	s.logger.Debug("Port", zap.Int("Port", s.config.Port))
+	//csrf
+	s.logger.Debug("----- CSRF Configuration -----")
+	s.logger.Debug("CSRFProtection", zap.Bool("CSRFProtection", s.config.CSRFProtection))
+	if s.config.CSRFProtection {
+		s.logger.Debug("CSRFTokenLength", zap.Int("CSRFTokenLength", 32))
+		s.logger.Debug("CSRFTokenLookup", zap.String("CSRFTokenLookup", "header:X-CSRF-Token"))
+		s.logger.Debug("CSRFCookieName", zap.String("CSRFCookieName", "csrf"))
+		s.logger.Debug("CSRFCookiePath", zap.String("CSRFCookiePath", "/"))
+		s.logger.Debug("CSRFCookieSecure", zap.Bool("CSRFCookieSecure", s.config.CSRFSecure))
+		s.logger.Debug("CSRFCookieHTTPOnly", zap.Bool("CSRFCookieHTTPOnly", true))
+	}
 	//cors
 	s.logger.Debug("----- Cors Configuration -----")
 	s.logger.Debug("AllowOrigins", zap.String("AllowOrigins", s.config.AllowOrigins))
