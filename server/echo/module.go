@@ -21,6 +21,7 @@ const (
 	DefaultPort           = 3001
 	DefaultCSRFProtection = false
 	DefaultCSRFSecure     = false
+	DefaultCSRFDomain     = "localhost"
 )
 
 type Config struct {
@@ -29,6 +30,7 @@ type Config struct {
 	AllowOrigins   string
 	CSRFProtection bool
 	CSRFSecure     bool
+	CSRFDomain     string
 	Host           string
 	LogLevel       string
 	Port           int
@@ -85,6 +87,7 @@ func loadConfig(scope string) *Config {
 
 	viper.SetDefault(fmt.Sprintf("%s.csrf_protection", scope), DefaultCSRFProtection)
 	viper.SetDefault(fmt.Sprintf("%s.csrf_secure", scope), DefaultCSRFSecure)
+	viper.SetDefault(fmt.Sprintf("%s.csrf_domain", scope), DefaultCSRFDomain)
 
 	viper.SetDefault(fmt.Sprintf("%s.host", scope), DefaultHost)
 	viper.SetDefault(fmt.Sprintf("%s.log_level", scope), DefaultLogLevel)
@@ -101,6 +104,7 @@ func loadConfig(scope string) *Config {
 
 		CSRFProtection: viper.GetBool(getConfigPath("csrf_protection")),
 		CSRFSecure:     viper.GetBool(getConfigPath("csrf_secure")),
+		CSRFDomain:     viper.GetString(getConfigPath("csrf_domain")),
 
 		Host:     viper.GetString(getConfigPath("host")),
 		Port:     viper.GetInt(getConfigPath("port")),
@@ -142,11 +146,10 @@ func (s *HTTPServer) setUpCSRFMiddleware() {
 	}
 
 	csrfConfig := middleware.CSRFConfig{
-		TokenLength:    32,
-		TokenLookup:    "header:X-CSRF-Token",
-		CookieName:     "csrf",
+		TokenLookup:    "cookie:_csrf",
 		CookiePath:     "/",
-		CookieSecure:   false,
+		CookieDomain:   s.config.CSRFDomain,
+		CookieSecure:   s.config.CSRFSecure,
 		CookieHTTPOnly: true,
 	}
 	s.server.Use(middleware.CSRFWithConfig(csrfConfig))
@@ -264,10 +267,9 @@ func (s *HTTPServer) PrintDebugLogs() {
 	s.logger.Debug("----- CSRF Configuration -----")
 	s.logger.Debug("CSRFProtection", zap.Bool("CSRFProtection", s.config.CSRFProtection))
 	if s.config.CSRFProtection {
-		s.logger.Debug("CSRFTokenLength", zap.Int("CSRFTokenLength", 32))
-		s.logger.Debug("CSRFTokenLookup", zap.String("CSRFTokenLookup", "header:X-CSRF-Token"))
-		s.logger.Debug("CSRFCookieName", zap.String("CSRFCookieName", "csrf"))
+		s.logger.Debug("CSRFTokenLookup", zap.String("CSRFTokenLookup", "cookie:_csrf"))
 		s.logger.Debug("CSRFCookiePath", zap.String("CSRFCookiePath", "/"))
+		s.logger.Debug("CSRFCookieDomain", zap.String("CSRFCookieDomain", s.config.CSRFDomain))
 		s.logger.Debug("CSRFCookieSecure", zap.Bool("CSRFCookieSecure", s.config.CSRFSecure))
 		s.logger.Debug("CSRFCookieHTTPOnly", zap.Bool("CSRFCookieHTTPOnly", true))
 	}
