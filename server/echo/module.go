@@ -111,8 +111,9 @@ func loadConfig(scope string) *Config {
 func (s *HTTPServer) onStart(ctx context.Context) error {
 	s.logger.Info("HTTPServer initiated")
 
-	s.setUpCSRFMiddleware()
 	s.setUpCorsMiddleware()
+	s.setUpCSRFMiddleware()
+
 	s.setUpRequestLoggerMiddleware()
 
 	go s.startServer(true, true)
@@ -254,6 +255,11 @@ func (s *HTTPServer) PrintDebugLogs() {
 	s.logger.Debug("----- Server Configuration -----")
 	s.logger.Debug("Host", zap.String("Host", s.config.Host))
 	s.logger.Debug("Port", zap.Int("Port", s.config.Port))
+	//cors
+	s.logger.Debug("----- Cors Configuration -----")
+	s.logger.Debug("AllowOrigins", zap.String("AllowOrigins", s.config.AllowOrigins))
+	s.logger.Debug("AllowMethods", zap.String("AllowMethods", s.config.AllowMethods))
+	s.logger.Debug("AllowHeaders", zap.String("AllowHeaders", s.config.AllowHeaders))
 	//csrf
 	s.logger.Debug("----- CSRF Configuration -----")
 	s.logger.Debug("CSRFProtection", zap.Bool("CSRFProtection", s.config.CSRFProtection))
@@ -265,9 +271,4 @@ func (s *HTTPServer) PrintDebugLogs() {
 		s.logger.Debug("CSRFCookieSecure", zap.Bool("CSRFCookieSecure", s.config.CSRFSecure))
 		s.logger.Debug("CSRFCookieHTTPOnly", zap.Bool("CSRFCookieHTTPOnly", true))
 	}
-	//cors
-	s.logger.Debug("----- Cors Configuration -----")
-	s.logger.Debug("AllowOrigins", zap.String("AllowOrigins", s.config.AllowOrigins))
-	s.logger.Debug("AllowMethods", zap.String("AllowMethods", s.config.AllowMethods))
-	s.logger.Debug("AllowHeaders", zap.String("AllowHeaders", s.config.AllowHeaders))
 }
