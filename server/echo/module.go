@@ -159,9 +159,10 @@ func (s *HTTPServer) setUpCSRFMiddleware() {
 func (s *HTTPServer) setUpCorsMiddleware() {
 	// configure CORS middleware
 	corsConfig := middleware.CORSConfig{
-		AllowOrigins: strings.Split(s.config.AllowOrigins, ","),
-		AllowMethods: strings.Split(s.config.AllowMethods, ","),
-		AllowHeaders: strings.Split(s.config.AllowHeaders, ","),
+		AllowOrigins:     strings.Split(s.config.AllowOrigins, ","),
+		AllowMethods:     strings.Split(s.config.AllowMethods, ","),
+		AllowHeaders:     strings.Split(s.config.AllowHeaders, ","),
+		AllowCredentials: true,
 	}
 	if s.config.AllowOrigins == "" {
 		corsConfig.AllowOrigins = []string{"*"}
