@@ -150,6 +150,7 @@ func (s *HTTPServer) setUpCSRFMiddleware() {
 		CookiePath:     "/",
 		CookieDomain:   s.config.CSRFDomain,
 		CookieSecure:   s.config.CSRFSecure,
+		CookieSameSite: http.SameSiteLaxMode,
 		CookieHTTPOnly: true,
 	}
 	s.server.Use(middleware.CSRFWithConfig(csrfConfig))
