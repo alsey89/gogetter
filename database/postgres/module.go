@@ -34,7 +34,7 @@ type Config struct {
 	AutoMigrate bool
 }
 
-type Database struct {
+type Module struct {
 	logger *zap.Logger
 	config *Config
 	schema []interface{}
@@ -53,11 +53,11 @@ type Params struct {
 func InitiateModuleAndSchema(scope string, schema ...interface{}) fx.Option {
 	return fx.Module(
 		scope,
-		fx.Provide(func(p Params) (*Database, error) {
+		fx.Provide(func(p Params) (*Module, error) {
 			logger := p.Logger.Named("[" + scope + "]")
 			config := loadConfig(scope)
 
-			database := &Database{
+			database := &Module{
 				logger: logger,
 				config: config,
 				scope:  scope,
@@ -70,40 +70,40 @@ func InitiateModuleAndSchema(scope string, schema ...interface{}) fx.Option {
 
 			return database, nil
 		}),
-		fx.Invoke(func(d *Database, p Params) {
+		fx.Invoke(func(m *Module, p Params) {
 			p.Lifecycle.Append(
 				fx.Hook{
-					OnStart: d.onStart,
-					OnStop:  d.onStop,
+					OnStart: m.onStart,
+					OnStop:  m.onStop,
 				},
 			)
 		}),
 	)
 }
 
-func (d *Database) onStart(context.Context) error {
-	d.logger.Info("Database initiated")
-	if d.config.AutoMigrate {
-		d.Migrate(d.schema...)
+func (m *Module) onStart(context.Context) error {
+	m.logger.Info("Database initiated")
+	if m.config.AutoMigrate {
+		m.Migrate(m.schema...)
 	}
 
-	d.printDebugLogs()
+	m.printDebugLogs()
 	return nil
 }
 
-func (d *Database) onStop(context.Context) error {
-	dbSql, err := d.db.DB()
+func (m *Module) onStop(context.Context) error {
+	dbSql, err := m.db.DB()
 	if err != nil {
-		d.logger.Error("Error getting DB from GORM", zap.Error(err))
+		m.logger.Error("Error getting DB from GORM", zap.Error(err))
 		return err
 	}
 
 	err = dbSql.Close()
 	if err != nil {
-		d.logger.Error("Error closing DB", zap.Error(err))
+		m.logger.Error("Error closing DB", zap.Error(err))
 	}
 
-	d.logger.Info("Database connection stopped")
+	m.logger.Info("Database connection stopped")
 	return nil
 }
 
@@ -136,24 +136,24 @@ func loadConfig(scope string) *Config {
 	}
 }
 
-func (d *Database) setUpDBConnectionOrFatal() *gorm.DB {
-	dsn := d.getConnectionStringFromConfig()
-	loglevel := d.getLogLevelFromConfig()
+func (m *Module) setUpDBConnectionOrFatal() *gorm.DB {
+	dsn := m.getConnectionStringFromConfig()
+	loglevel := m.getLogLevelFromConfig()
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: gorm_logger.Default.LogMode(loglevel),
 	})
 	if err != nil {
-		d.logger.Fatal("Error connecting to database", zap.Error(err))
+		m.logger.Fatal("Error connecting to database", zap.Error(err))
 	}
 
 	return db
 }
-func (d *Database) getConnectionStringFromConfig() string {
+func (m *Module) getConnectionStringFromConfig() string {
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		d.config.Host, d.config.Port, d.config.User, d.config.Password, d.config.DBName, d.config.SSLMode)
+		m.config.Host, m.config.Port, m.config.User, m.config.Password, m.config.DBName, m.config.SSLMode)
 }
-func (d *Database) getLogLevelFromConfig() gorm_logger.LogLevel {
-	switch d.config.LogLevel {
+func (m *Module) getLogLevelFromConfig() gorm_logger.LogLevel {
+	switch m.config.LogLevel {
 	case "silent":
 		return gorm_logger.Silent
 	case "error":
@@ -167,25 +167,25 @@ func (d *Database) getLogLevelFromConfig() gorm_logger.LogLevel {
 	}
 }
 
-func (d *Database) printDebugLogs() {
+func (m *Module) printDebugLogs() {
 	//* Debug Logs
-	d.logger.Debug("----- Database Configuration -----")
-	d.logger.Debug("Host", zap.String("host", d.config.Host))
-	d.logger.Debug("Port", zap.Int("port", d.config.Port))
-	d.logger.Debug("DBName", zap.String("dbname", d.config.DBName))
-	d.logger.Debug("User", zap.String("user", d.config.User))
-	d.logger.Debug("SSLMode", zap.String("sslmode", d.config.SSLMode))
+	m.logger.Debug("----- Database Configuration -----")
+	m.logger.Debug("Host", zap.String("host", m.config.Host))
+	m.logger.Debug("Port", zap.Int("port", m.config.Port))
+	m.logger.Debug("DBName", zap.String("dbname", m.config.DBName))
+	m.logger.Debug("User", zap.String("user", m.config.User))
+	m.logger.Debug("SSLMode", zap.String("sslmode", m.config.SSLMode))
 }
 
-func (d *Database) Migrate(schema ...interface{}) {
-	d.logger.Info("Auto migrating database")
-	err := d.db.AutoMigrate(schema...)
+func (m *Module) Migrate(schema ...interface{}) {
+	m.logger.Info("Auto migrating database")
+	err := m.db.AutoMigrate(schema...)
 	if err != nil {
-		d.logger.Error("Error auto migrating database", zap.Error(err))
+		m.logger.Error("Error auto migrating database", zap.Error(err))
 	}
 }
 
 // GETTERS ---------------------------------------------------------
-func (d *Database) GetDB() *gorm.DB {
-	return d.db
+func (m *Module) GetDB() *gorm.DB {
+	return m.db
 }

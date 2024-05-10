@@ -16,11 +16,11 @@ const (
 
 var defaultConfigFilePaths = []string{"./", "./configs"}
 
-type Config struct {
+type Module struct {
 	loglevel string
 }
 
-func SetUpConfig(prefix string, configFileType string) *Config {
+func SetUpConfig(prefix string, configFileType string) *Module {
 	//environmental variables
 	if prefix != "" {
 		viper.SetEnvPrefix(prefix)
@@ -39,7 +39,7 @@ func SetUpConfig(prefix string, configFileType string) *Config {
 
 	readConfigWithOptionalOverride("config", "config.override", validatedConfigFileType)
 
-	config := &Config{
+	config := &Module{
 		loglevel: viper.GetString("system.loglevel"),
 	}
 
@@ -108,7 +108,7 @@ func validateConfigFileType(configFileType string) string {
 
 // ---------------------------------------------------------
 
-func (c *Config) PrintDebugLogs(prefix string, configFileType string) {
+func (m *Module) PrintDebugLogs(prefix string, configFileType string) {
 	log.Println("----- Config Setup -----")
 	log.Printf("|| Prefix   %s", prefix)
 	log.Printf("|| replacer %s", ". -> _")
@@ -122,7 +122,7 @@ func (c *Config) PrintDebugLogs(prefix string, configFileType string) {
 // ---------------------------------------------------------
 
 // Fallback configurations will be applied if there is no config file or environment variables
-func (c *Config) SetFallbackConfigs(configs map[string]interface{}) {
+func (m *Module) SetFallbackConfigs(configs map[string]interface{}) {
 
 	for k, v := range configs {
 		if !viper.IsSet(k) {

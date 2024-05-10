@@ -51,7 +51,7 @@ func TestConfigs(t *testing.T) {
 	})
 }
 func TestGetConnectionStringFromConfig(t *testing.T) {
-	d := &Database{
+	d := &Module{
 		config: &Config{
 			Host:     "testhost",
 			Port:     1234,
@@ -69,7 +69,7 @@ func TestGetConnectionStringFromConfig(t *testing.T) {
 }
 
 func TestGetLogLevelFromConfig(t *testing.T) {
-	d := &Database{
+	d := &Module{
 		config: &Config{
 			LogLevel: "debug",
 		},

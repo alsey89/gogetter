@@ -41,7 +41,7 @@ func TestLoadConfigDefaults(t *testing.T) {
 
 	// Asserts
 	assert.Equal(t, defaultTokenLookup, config.TokenLookup)
-	assert.Equal(t, defaultSecret, config.SigningKey)
+	assert.Equal(t, defaultSigningKey, config.SigningKey)
 	assert.Equal(t, defaultSigningMethod, config.SigningMethod)
 	assert.Equal(t, defaultExpInHours, config.ExpInHours)
 
@@ -57,8 +57,8 @@ func TestInitiateModule(t *testing.T) {
 		}),
 
 		InitiateModule("test_echo_jwt"),
-		fx.Invoke(func(JWT *JWT) {
-			assert.NotNil(t, JWT, "JWT should be initialized")
+		fx.Invoke(func(Module *Module) {
+			assert.NotNil(t, Module, "Module should be initialized")
 		}),
 	)
 
@@ -74,7 +74,7 @@ func TestInitiateModule(t *testing.T) {
 }
 
 func TestGenerateToken(t *testing.T) {
-	j := &JWT{
+	j := &Module{
 		config: &Config{
 			SigningKey:    "secret",
 			SigningMethod: "HS256",
@@ -107,11 +107,11 @@ func TestJWTMiddleware(t *testing.T) {
 	app := fxtest.New(t,
 		fx.Provide(func() *zap.Logger { return logger }),
 		InitiateModule("test_echo_jwt"),
-		fx.Invoke(func(jwt *JWT) {
+		fx.Invoke(func(m *Module) {
 			e := echo.New()
 			e.GET("/test", func(c echo.Context) error {
 				return c.String(http.StatusOK, "Authorized")
-			}, jwt.Middleware())
+			}, m.Middleware())
 
 			t.Run("TestUnauthorizedAccess", func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/test", nil)
@@ -121,7 +121,7 @@ func TestJWTMiddleware(t *testing.T) {
 			})
 
 			t.Run("TestAuthorizedAccess", func(t *testing.T) {
-				token, err := jwt.GenerateToken(testClaims)
+				token, err := m.GenerateToken(testClaims)
 				assert.NoError(t, err)
 				assert.NotNil(t, token)
 

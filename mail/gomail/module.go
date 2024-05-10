@@ -31,7 +31,7 @@ type Config struct {
 	TLS         bool
 }
 
-type Mailer struct {
+type Module struct {
 	logger *zap.Logger
 	config *Config
 
@@ -48,16 +48,16 @@ type Params struct {
 
 func InitiateModule(scope string) fx.Option {
 
-	var m *Mailer
+	var m *Module
 
 	return fx.Module(
 		scope,
-		fx.Provide(func(p Params) *Mailer {
+		fx.Provide(func(p Params) *Module {
 			logger := p.Logger.Named("[" + scope + "]")
 			config := loadConfig(scope)
 			dialer := gomail.NewDialer(config.Host, config.Port, config.Username, config.AppPassword)
 
-			m := &Mailer{
+			m := &Module{
 				logger: logger,
 				config: config,
 				scope:  scope,
@@ -67,7 +67,7 @@ func InitiateModule(scope string) fx.Option {
 			return m
 		}),
 		fx.Populate(&m),
-		fx.Invoke(func(p Params) *Mailer {
+		fx.Invoke(func(p Params) *Module {
 
 			p.Lifecycle.Append(
 				fx.Hook{
@@ -103,7 +103,7 @@ func loadConfig(scope string) *Config {
 	}
 }
 
-func (m *Mailer) onStart(ctx context.Context) error {
+func (m *Module) onStart(ctx context.Context) error {
 	m.logger.Info("Mailer initiated")
 
 	err := m.TestSMTPConnection()
@@ -112,6 +112,31 @@ func (m *Mailer) onStart(ctx context.Context) error {
 		return err
 	}
 
+	m.PrintDebugLogs()
+
+	return nil
+}
+
+func (m *Module) onStop(ctx context.Context) error {
+
+	m.logger.Info("Gomail stopped")
+
+	return nil
+}
+
+// ----------------------------------------------------------
+
+func (m *Module) NewMessage() *gomail.Message {
+	return gomail.NewMessage()
+}
+
+func (m *Module) Send(msg *gomail.Message) error {
+	return m.dialer.DialAndSend(msg)
+}
+
+// ----------------------------------------------------------
+
+func (m *Module) PrintDebugLogs() {
 	//* Debug logs
 	m.logger.Debug("----- Mailer Configuration -----")
 	m.logger.Debug("Host", zap.String("Host", m.config.Host))
@@ -119,29 +144,10 @@ func (m *Mailer) onStart(ctx context.Context) error {
 	m.logger.Debug("Username", zap.String("Username", m.config.Username))
 	m.logger.Debug("AppPassword", zap.String("AppPassword", m.config.AppPassword))
 	m.logger.Debug("TLS", zap.Bool("TLS", m.config.TLS))
-
-	return nil
 }
 
-func (m *Mailer) onStop(ctx context.Context) error {
-
-	m.logger.Info("Gomail stopped")
-
-	return nil
-}
-
-func (m *Mailer) NewMessage() *gomail.Message {
-	return gomail.NewMessage()
-}
-
-func (m *Mailer) Send(msg *gomail.Message) error {
-	return m.dialer.DialAndSend(msg)
-}
-
-// ----------------------------------------------------------
-
-func (m *Mailer) TestSMTPConnection() error {
-	// m.logger.Info("Testing SMTP connection...")
+func (m *Module) TestSMTPConnection() error {
+	m.logger.Info("Testing SMTP connection...")
 	s, err := m.dialer.Dial()
 	if err != nil {
 		m.logger.Error("Failed to connect to the SMTP server", zap.Error(err))
@@ -149,11 +155,11 @@ func (m *Mailer) TestSMTPConnection() error {
 	}
 	defer s.Close()
 
-	// m.logger.Info("Successfully connected to the SMTP server.")
+	m.logger.Info("Successfully connected to the SMTP server.")
 	return nil
 }
 
-func (m *Mailer) SendTestMail(to, subject, body string) error {
+func (m *Module) SendTestMail(to, subject, body string) error {
 	msg := m.NewMessage()
 	msg.SetHeader("From", DefaultFrom)
 	msg.SetHeader("To", to)

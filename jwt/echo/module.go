@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	defaultSecret        = "secret"
+	defaultSigningKey    = "secret"
 	defaultTokenLookup   = "cookie:jwt"
 	defaultSigningMethod = "HS256"
 	defaultExpInHours    = 72
@@ -27,7 +27,7 @@ type Config struct {
 	ExpInHours    int
 }
 
-type JWT struct {
+type Module struct {
 	logger *zap.Logger
 	config *Config
 
@@ -44,10 +44,10 @@ type Params struct {
 
 // InitiateModule initializes the JWT middleware with the provided scope.
 // CONFIG --> scope.token_lookup, scope.signing_key, scope.signing_method, scope.exp_in_hours
-func InitiateModule(scope string) fx.Option {
+func InitiateModule(...scope string) fx.Option {
 	return fx.Module(
 		scope,
-		fx.Provide(func(p Params) (*JWT, error) {
+		fx.Provide(func(p Params) (*Module, error) {
 			logger := p.Logger.Named("[" + scope + "]")
 			config := loadConfig(scope)
 
@@ -61,20 +61,20 @@ func InitiateModule(scope string) fx.Option {
 				},
 			})
 
-			j := &JWT{
+			m := &Module{
 				logger:     logger,
 				config:     config,
 				scope:      scope,
 				middleware: middleware,
 			}
 
-			return j, nil
+			return m, nil
 		}),
-		fx.Invoke(func(j *JWT, p Params) {
+		fx.Invoke(func(m *Module, p Params) {
 			p.Lifecycle.Append(
 				fx.Hook{
-					OnStart: j.onStart,
-					OnStop:  j.onStop,
+					OnStart: m.onStart,
+					OnStop:  m.onStop,
 				},
 			)
 		}),
@@ -88,7 +88,7 @@ func loadConfig(scope string) *Config {
 
 	//set defaults
 	viper.SetDefault(getConfigPath("token_lookup"), defaultTokenLookup)
-	viper.SetDefault(getConfigPath("signing_key"), defaultSecret)
+	viper.SetDefault(getConfigPath("signing_key"), defaultSigningKey)
 	viper.SetDefault(getConfigPath("signing_method"), defaultSigningMethod)
 	viper.SetDefault(getConfigPath("exp_in_hours"), defaultExpInHours)
 
@@ -100,51 +100,51 @@ func loadConfig(scope string) *Config {
 	}
 }
 
-func (j *JWT) onStart(ctx context.Context) error {
-	j.logger.Info("JWT Middleware initiated")
+func (m *Module) onStart(ctx context.Context) error {
+	m.logger.Info("JWT Middleware initiated")
 
-	j.PrintDebugLogs()
+	m.PrintDebugLogs()
 
 	return nil
 }
 
-func (j *JWT) onStop(ctx context.Context) error {
-	j.logger.Info("Stopping JWT")
+func (m *Module) onStop(ctx context.Context) error {
+	m.logger.Info("Stopping JWT")
 	return nil
 }
 
 //! ------------------------------------------------------------
 
-func (j *JWT) PrintDebugLogs() {
-	j.logger.Debug("----- JWT Middleware Configuration -----")
-	j.logger.Debug("TokenLookup", zap.String("TokenLookup", j.config.TokenLookup))
-	j.logger.Debug("SigningKey", zap.Any("SigningKey", j.config.SigningKey))
-	j.logger.Debug("SigningMethod", zap.String("SigningMethod", j.config.SigningMethod))
+func (m *Module) PrintDebugLogs() {
+	m.logger.Debug("----- JWT Middleware Configuration -----")
+	m.logger.Debug("TokenLookup", zap.String("TokenLookup", m.config.TokenLookup))
+	m.logger.Debug("SigningKey", zap.Any("SigningKey", m.config.SigningKey))
+	m.logger.Debug("SigningMethod", zap.String("SigningMethod", m.config.SigningMethod))
 }
 
 // Middleware returns the echo.MiddlewareFunc for JWT authentication.
-func (j *JWT) Middleware() echo.MiddlewareFunc {
-	return j.middleware
+func (m *Module) Middleware() echo.MiddlewareFunc {
+	return m.middleware
 }
 
 // GenerateToken generates a JWT token with the provided additional claims.
 // It takes additionalClaims as input, which is a map of custom claims to be added to the token.
 // SigningKey, SigningMethod, and ExpInHours are taken from the config keys scope.signing_key, scope.signing_method, and scope.exp_in_hours respectively.
 // The function returns a pointer to the generated token string and an error, if any.
-func (j *JWT) GenerateToken(additionalClaims jwt.MapClaims) (*string, error) {
+func (m *Module) GenerateToken(additionalClaims jwt.MapClaims) (*string, error) {
 
 	claims := jwt.MapClaims{
-		"exp": jwt.NewNumericDate(time.Now().Add(time.Hour * time.Duration(j.config.ExpInHours))),
+		"exp": jwt.NewNumericDate(time.Now().Add(time.Hour * time.Duration(m.config.ExpInHours))),
 	}
 
 	for key, value := range additionalClaims {
 		claims[key] = value
 	}
 
-	token := jwt.NewWithClaims(jwt.GetSigningMethod(j.config.SigningMethod), claims)
-	t, err := token.SignedString([]byte(j.config.SigningKey))
+	token := jwt.NewWithClaims(jwt.GetSigningMethod(m.config.SigningMethod), claims)
+	t, err := token.SignedString([]byte(m.config.SigningKey))
 	if err != nil {
-		j.logger.Error("Failed to generate token", zap.Error(err))
+		m.logger.Error("Failed to generate token", zap.Error(err))
 		return nil, err
 	}
 	return &t, nil
