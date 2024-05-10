@@ -44,7 +44,7 @@ type Params struct {
 
 // InitiateModule initializes the JWT middleware with the provided scope.
 // CONFIG --> scope.token_lookup, scope.signing_key, scope.signing_method, scope.exp_in_hours
-func InitiateModule(...scope string) fx.Option {
+func InitiateModule(scope string) fx.Option {
 	return fx.Module(
 		scope,
 		fx.Provide(func(p Params) (*Module, error) {
