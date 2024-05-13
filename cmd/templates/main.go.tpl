@@ -64,7 +64,7 @@ func main() {
 		{{- if .IncludeDBConnector }}
 		postgres.InitiateModuleAndSchema("database"),
 		{{- end }}
-		{{- if .IncludeJWT }}
+		{{- if .IncludeJWTMiddleware }}
 		echo_jwt.InitiateModule("echo_jwt"),
 		{{- end }}
 		{{- if .IncludeMailer }}
