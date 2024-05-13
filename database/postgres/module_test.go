@@ -50,6 +50,7 @@ func TestConfigs(t *testing.T) {
 		viper.Reset()
 	})
 }
+
 func TestGetConnectionStringFromConfig(t *testing.T) {
 	d := &Module{
 		config: &Config{

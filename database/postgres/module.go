@@ -10,6 +10,8 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gorm_logger "gorm.io/gorm/logger"
+
+	"github.com/alsey89/gogetter/common"
 )
 
 const (
@@ -103,36 +105,32 @@ func (m *Module) onStop(context.Context) error {
 		m.logger.Error("Error closing DB", zap.Error(err))
 	}
 
-	m.logger.Info("Database connection stopped")
+	m.logger.Info("Database module stopped")
 	return nil
 }
 
 // ---------------------------------------------------------
 
 func loadConfig(scope string) *Config {
-	getConfigPath := func(key string) string {
-		return fmt.Sprintf("%s.%s", scope, key)
-	}
-
 	//set default values
-	viper.SetDefault(getConfigPath("host"), DefaultHost)
-	viper.SetDefault(getConfigPath("port"), DefaultPort)
-	viper.SetDefault(getConfigPath("dbname"), DefaultDbName)
-	viper.SetDefault(getConfigPath("user"), DefaultUser)
-	viper.SetDefault(getConfigPath("password"), DefaultPassword)
-	viper.SetDefault(getConfigPath("sslmode"), DefaultSSLMode)
-	viper.SetDefault(getConfigPath("log_level"), DefaultLogLevel)
-	viper.SetDefault(getConfigPath("auto_migrate"), DefaultAutoMigrate)
+	viper.SetDefault(common.GetConfigPath(scope, "host"), DefaultHost)
+	viper.SetDefault(common.GetConfigPath(scope, "port"), DefaultPort)
+	viper.SetDefault(common.GetConfigPath(scope, "dbname"), DefaultDbName)
+	viper.SetDefault(common.GetConfigPath(scope, "user"), DefaultUser)
+	viper.SetDefault(common.GetConfigPath(scope, "password"), DefaultPassword)
+	viper.SetDefault(common.GetConfigPath(scope, "sslmode"), DefaultSSLMode)
+	viper.SetDefault(common.GetConfigPath(scope, "log_level"), DefaultLogLevel)
+	viper.SetDefault(common.GetConfigPath(scope, "auto_migrate"), DefaultAutoMigrate)
 
 	return &Config{
-		Host:        viper.GetString(getConfigPath("host")),
-		Port:        viper.GetInt(getConfigPath("port")),
-		DBName:      viper.GetString(getConfigPath("dbname")),
-		User:        viper.GetString(getConfigPath("user")),
-		Password:    viper.GetString(getConfigPath("password")),
-		SSLMode:     viper.GetString(getConfigPath("sslmode")),
-		LogLevel:    viper.GetString(getConfigPath("log_level")),
-		AutoMigrate: viper.GetBool(getConfigPath("auto_migrate")),
+		Host:        viper.GetString(common.GetConfigPath(scope, "host")),
+		Port:        viper.GetInt(common.GetConfigPath(scope, "port")),
+		DBName:      viper.GetString(common.GetConfigPath(scope, "dbname")),
+		User:        viper.GetString(common.GetConfigPath(scope, "user")),
+		Password:    viper.GetString(common.GetConfigPath(scope, "password")),
+		SSLMode:     viper.GetString(common.GetConfigPath(scope, "sslmode")),
+		LogLevel:    viper.GetString(common.GetConfigPath(scope, "log_level")),
+		AutoMigrate: viper.GetBool(common.GetConfigPath(scope, "auto_migrate")),
 	}
 }
 

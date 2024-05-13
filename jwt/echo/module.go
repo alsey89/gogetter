@@ -2,7 +2,6 @@ package jwt
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -11,6 +10,8 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
+
+	"github.com/alsey89/gogetter/common"
 )
 
 const (
@@ -82,21 +83,18 @@ func InitiateModule(scope string) fx.Option {
 }
 
 func loadConfig(scope string) *Config {
-	getConfigPath := func(key string) string {
-		return fmt.Sprintf("%s.%s", scope, key)
-	}
 
 	//set defaults
-	viper.SetDefault(getConfigPath("token_lookup"), defaultTokenLookup)
-	viper.SetDefault(getConfigPath("signing_key"), defaultSigningKey)
-	viper.SetDefault(getConfigPath("signing_method"), defaultSigningMethod)
-	viper.SetDefault(getConfigPath("exp_in_hours"), defaultExpInHours)
+	viper.SetDefault(common.GetConfigPath(scope, "token_lookup"), defaultTokenLookup)
+	viper.SetDefault(common.GetConfigPath(scope, "signing_key"), defaultSigningKey)
+	viper.SetDefault(common.GetConfigPath(scope, "signing_method"), defaultSigningMethod)
+	viper.SetDefault(common.GetConfigPath(scope, "exp_in_hours"), defaultExpInHours)
 
 	return &Config{
-		TokenLookup:   viper.GetString(getConfigPath("token_lookup")),
-		SigningKey:    viper.GetString(getConfigPath("signing_key")),
-		SigningMethod: viper.GetString(getConfigPath("signing_method")),
-		ExpInHours:    viper.GetInt(getConfigPath("exp_in_hours")),
+		TokenLookup:   viper.GetString(common.GetConfigPath(scope, "token_lookup")),
+		SigningKey:    viper.GetString(common.GetConfigPath(scope, "signing_key")),
+		SigningMethod: viper.GetString(common.GetConfigPath(scope, "signing_method")),
+		ExpInHours:    viper.GetInt(common.GetConfigPath(scope, "exp_in_hours")),
 	}
 }
 
@@ -109,7 +107,7 @@ func (m *Module) onStart(ctx context.Context) error {
 }
 
 func (m *Module) onStop(ctx context.Context) error {
-	m.logger.Info("Stopping JWT")
+	m.logger.Info("JWT module stopped")
 	return nil
 }
 
@@ -120,6 +118,7 @@ func (m *Module) PrintDebugLogs() {
 	m.logger.Debug("TokenLookup", zap.String("TokenLookup", m.config.TokenLookup))
 	m.logger.Debug("SigningKey", zap.Any("SigningKey", m.config.SigningKey))
 	m.logger.Debug("SigningMethod", zap.String("SigningMethod", m.config.SigningMethod))
+	m.logger.Debug("ExpInHours", zap.Int("ExpInHours", m.config.ExpInHours))
 }
 
 // Middleware returns the echo.MiddlewareFunc for JWT authentication.
