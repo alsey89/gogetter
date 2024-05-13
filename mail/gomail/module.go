@@ -107,7 +107,6 @@ func (m *Module) onStart(ctx context.Context) error {
 	err := m.TestSMTPConnection()
 	if err != nil {
 		m.logger.Error("Failed to connect to the SMTP server", zap.Error(err))
-		return err
 	}
 
 	m.PrintDebugLogs()

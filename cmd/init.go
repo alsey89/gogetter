@@ -48,8 +48,6 @@ type ProjectConfig struct {
 
 	SetUpGit        bool
 	SetUpDockerFile bool
-
-	// todo add project specific modules
 }
 
 func setUpProject() {
@@ -60,29 +58,29 @@ func setUpProject() {
 	}
 
 	//* Collect Project Configurations
-	projectConfig := &ProjectConfig{
+	c := &ProjectConfig{
 		IncludeLogger:     true,
 		IncludeConfig:     true,
 		IncludeHTTPServer: true,
 	}
 
 	// project name
-	projectConfig.Module = inputText("Enter the go module name for your project. [Example: github.com/alsey89/gogetter]", true)
+	c.Module = inputText("Enter the go module name for your project. [Example: github.com/alsey89/gogetter]", true)
 
 	// project directory
-	projectConfig.Path = inputText("Enter the path for your project. Service will be initiated at the current directory if left empty.", false)
+	c.Path = inputText("Enter the path for your project. Service will be initiated at the current directory if left empty.", false)
 
 	// project modules
-	projectConfig.IncludeJWTMiddleware = selectYesNo("Do you want to include a JWT middleware module?", true)
-	projectConfig.IncludeDBConnector = selectYesNo("Do you want to include a database module with Postgres and GORM?", true)
-	projectConfig.IncludeMailer = selectYesNo("Do you want to include a mailer module using Gomail?", true)
+	c.IncludeJWTMiddleware = selectYesNo("Do you want to include a JWT middleware module?", true)
+	c.IncludeDBConnector = selectYesNo("Do you want to include a database module with Postgres and GORM?", true)
+	c.IncludeMailer = selectYesNo("Do you want to include a mailer module using Gomail?", true)
 
 	// git setup
-	projectConfig.SetUpGit = selectYesNo("Do you want to set up git for the project?", true)
+	c.SetUpGit = selectYesNo("Do you want to set up git for the project?", true)
 	// docker setup
-	projectConfig.SetUpDockerFile = selectYesNo("Do you want to set up docker for the project?", true)
+	c.SetUpDockerFile = selectYesNo("Do you want to set up docker for the project?", true)
 
-	executeSetup(projectConfig)
+	executeSetup(c)
 }
 
 func executeSetup(config *ProjectConfig) {
@@ -99,7 +97,7 @@ func executeSetup(config *ProjectConfig) {
 	}
 
 	if config.SetUpDockerFile {
-		err = createDockerfile(false)
+		err = createDockerfile()
 		if err != nil {
 			log.Fatalf("Error creating Dockerfile: %v", err)
 		}
@@ -131,7 +129,7 @@ func createGoModule(name string) error {
 //go:embed templates/*
 var templateFS embed.FS
 
-func createMainFile(projectConfig *ProjectConfig) error {
+func createMainFile(c *ProjectConfig) error {
 	// Using the embedded file system to access the template
 	tmpl, err := template.ParseFS(templateFS, "templates/main.go.tpl")
 	if err != nil {
@@ -147,7 +145,7 @@ func createMainFile(projectConfig *ProjectConfig) error {
 	defer file.Close()
 
 	// Execute the template with the project configuration
-	if err := tmpl.Execute(file, projectConfig); err != nil {
+	if err := tmpl.Execute(file, c); err != nil {
 		log.Printf("Failed to execute template: %v", err)
 		return err
 	}
@@ -164,17 +162,8 @@ func createMainFile(projectConfig *ProjectConfig) error {
 	return nil
 }
 
-func createDockerfile(forDevelopment bool) error {
-	var templatePath string
-	var dockerfileName string
-
-	if forDevelopment {
-		templatePath = "templates/Dockerfile.dev.tpl"
-		dockerfileName = "Dockerfile.dev"
-	} else {
-		templatePath = "templates/Dockerfile.tpl"
-		dockerfileName = "Dockerfile"
-	}
+func createDockerfile() error {
+	templatePath := "templates/Dockerfile.tpl"
 
 	// Using the embedded file system to access the template
 	tmpl, err := template.ParseFS(templateFS, templatePath)
@@ -183,7 +172,7 @@ func createDockerfile(forDevelopment bool) error {
 		return err
 	}
 
-	file, err := os.Create(dockerfileName)
+	file, err := os.Create("Dockerfile")
 	if err != nil {
 		log.Printf("Failed to create file: %v", err)
 		return err
