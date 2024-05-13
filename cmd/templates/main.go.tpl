@@ -6,7 +6,7 @@ import (
 	"github.com/alsey89/gogetter/config/viper"
 	"github.com/alsey89/gogetter/logging/zap"
 	"github.com/alsey89/gogetter/server/echo"
-	{{ if .IncludeJWT }} "github.com/alsey89/gogetter/jwt/echo" {{ end }}
+	{{ if .IncludeJWTMiddleware }} "github.com/alsey89/gogetter/jwt/echo" {{ end }}
 	{{ if .IncludeMailer }} "github.com/alsey89/gogetter/mail/gomail" {{ end }}
 	{{ if .IncludeDBConnector }} "github.com/alsey89/gogetter/database/postgres" {{ end }}
 	// Internal domains can be imported below
@@ -47,7 +47,7 @@ func init() {
 		"mailer.app_password": "foo bar baz qux",
 		"mailer.tls":          true,
 		{{- end }}
-		{{- if .IncludeJWT }}
+		{{- if .IncludeJWTMiddleware }}
 		"echo_jwt.signing_key":    "authsecret",
 		"echo_jwt.token_lookup":   "cookie:jwt",
 		"echo_jwt.signing_method": "HS256",
