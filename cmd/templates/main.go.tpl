@@ -3,12 +3,12 @@ package main
 import (
 	"go.uber.org/fx"
 
-	"github.com/alsey89/gogetter/config/viper"
-	"github.com/alsey89/gogetter/logging/zap"
-	"github.com/alsey89/gogetter/server/echo"
-	{{ if .IncludeJWTMiddleware }} "github.com/alsey89/gogetter/jwt/echo" {{ end }}
-	{{ if .IncludeMailer }} "github.com/alsey89/gogetter/mail/gomail" {{ end }}
-	{{ if .IncludeDBConnector }} "github.com/alsey89/gogetter/database/postgres" {{ end }}
+	config "github.com/alsey89/gogetter/config/viper"
+	logger "github.com/alsey89/gogetter/logging/zap"
+	server "github.com/alsey89/gogetter/server/echo"
+	{{ if .IncludeJWTMiddleware }}jwt "github.com/alsey89/gogetter/jwt/echo" {{ end }}
+	{{ if .IncludeMailer }}mailer "github.com/alsey89/gogetter/mail/gomail" {{ end }}
+	{{ if .IncludeDBConnector }}database "github.com/alsey89/gogetter/database/postgres" {{ end }}
 	// Internal domains can be imported below
 )
 
@@ -59,16 +59,16 @@ func init() {
 func main() {
 	app := fx.New(
 		fx.Supply(configuration),
-		zap.InitiateModule(),
-		echo.InitiateModule("server"),
+		logger.InitiateModule(),
+		server.InitiateModule("server"),
 		{{- if .IncludeDBConnector }}
-		postgres.InitiateModuleAndSchema("database"),
+		database.InitiateModuleAndSchema("database"),
 		{{- end }}
 		{{- if .IncludeJWTMiddleware }}
-		echo_jwt.InitiateModule("echo_jwt"),
+		jwt.InitiateModule("echo_jwt"),
 		{{- end }}
 		{{- if .IncludeMailer }}
-		gomail.InitiateModule("mailer"),
+		mailer.InitiateModule("mailer"),
 		{{- end }}
 		
 		// Internal domains can be included here
