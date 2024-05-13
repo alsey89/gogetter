@@ -53,6 +53,24 @@ COMING SOON!
 
 The CLI tool, built with [Cobra](https://github.com/spf13/cobra), is a convenient way to spin up an entire service in one go.
 
+### Usage
+
+To use the CLI tool, install it first:
+
+```
+go install github.com/alsey89/gogetter/cmd/gogetter@latest
+```
+
+Use the following command to initialize the process:
+
+```
+gogetter init
+```
+
+### Troubleshooting
+
+If the command is not found after installation, check Go Environmental variables and system $PATH.
+
 ## Contribution
 
 Contributions are welcome! Please fork the repository and submit pull requests with your proposed changes. For major changes, please open an issue first to discuss what you would like to change.
