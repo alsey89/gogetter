@@ -12,11 +12,11 @@ import (
 	// Internal domains can be imported below
 )
 
-var configuration *viper.Module
+var configuration *config.Module
 
 func init() {
-	viper.SetSystemLogLevel("debug")
-	configuration = viper.SetUpConfig("SERVER", "yaml")
+	config.SetSystemLogLevel("debug")
+	configuration = config.SetUpConfig("SERVER", "yaml")
 	//! CONFIG PRECEDENCE: ENV > CONFIG FILE > FALLBACK
 	configuration.SetFallbackConfigs(map[string]interface{}{
 		"server.host":      "0.0.0.0",
