@@ -68,11 +68,11 @@ go install github.com/alsey89/gogetter/cmd/gogetter@latest
 
 ### Commands
 
-- [init](#gogetter-init)
-- [run](#gogetter-run)
-- [stop/down](#gogetter-stop)
+- [init](https://github.com/alsey89/gogetter/blob/main/README.md#init)
+- [run](https://github.com/alsey89/gogetter/blob/main/README.md#run)
+- [stop/down](https://github.com/alsey89/gogetter/blob/main/README.md#stopdown)
 
-#### Init {#gogetter-init}
+#### Init
 
 Init initializes the project. It sets up go module, creates a main.go file and installs the relevant dependencies. Optionally, it can set up a Dockerfile, a docker-compose.yaml, and git.
 
@@ -94,7 +94,7 @@ Here's an example of the process:
 ? Do you want a docker-compose setup for local development? This will set up a docker-compose file for a local postgres and server with volume mapping. You can add the frontend yourself if you want. Yes
 ```
 
-#### Run {#gogetter-run}
+#### Run
 
 Run spins up the docker-compose service, defaulting to a dev setup with automatic rebuild and reload.
 
@@ -112,7 +112,7 @@ Arguments:
 Effects:
 Check the [Dockerfile template](./cmd/templates/Dockerfile.tpl) to see how the BUILD_ENV affects the container setup.
 
-#### Stop/Down {#gogetter-stop}
+#### Stop/Down
 
 Stop/Down spins down running docker-compose service and removes orphans.
 
