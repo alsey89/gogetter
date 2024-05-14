@@ -23,9 +23,15 @@ GoGetter is a collection of reusable Go modules, pre-configured to work with [Ub
 - **Mailer**
   - [GoMail](https://github.com/go-gomail/gomail)
 
+### Per Module Documentation
+
+COMING SOON!
+
 ### Usage
 
 To use the modules in your project, simply import them from main, set up the configurations, and initiate them in your Fx App.
+
+Refer to [example.go](./example.go) for a working example.
 
 ### Configuration
 
@@ -44,10 +50,6 @@ There are 3 levels of configuration, listed in order of precedence:
 ### Injection
 
 Refer to [example.go](./example.go) for a working example.
-
-### Per Module Documentation
-
-COMING SOON!
 
 ## CLI
 
@@ -69,17 +71,17 @@ Init initializes the project. It sets up go module, creates a main.go file and i
 gogetter init
 ```
 
-Here's an example of how the process goes:
+Here's an example of the process:
 
 ```
 ? Welcome to the GoGetter CLI. This will begin the setup process for your new Go service. Continue? Yes
-? Enter the go module name for your project. [Example: github.com/alsey89/gogetter] testproject
+? Enter the go module name for your project. [Example: github.com/alsey89/gogetter] test
 ? Enter the directory for your project. Service will be initiated at the current directory if left empty.
-? Do you want to include a JWT middleware module? Yes
-? Do you want to include a database module with Postgres and GORM? Yes
-? Do you want to include a mailer module using Gomail? Yes
+? Do you want to include a Echo-JWT middleware module? Yes
+? Do you want to include a GORM Postgres database connector module? Yes
+? Do you want to include a GoMail mailer module? Yes
 ? Do you want to set up git for the project? Yes
-? Do you want to set up docker for the project? Yes
+? Do you want to set up Dockerfile for the project? Note: if no is selected, docker-compose setup will be skipped Yes
 ? Do you want a docker-compose setup for local development? This will set up a docker-compose file for a local postgres and server with volume mapping. You can add the frontend yourself if you want. Yes
 ```
 
@@ -88,7 +90,7 @@ Here's an example of how the process goes:
 Run spins up the docker-compose service, defaulting to a dev setup with automatic rebuild and reload.
 
 ```
-gogetter run
+gogetter run dev
 ```
 
 Arguments:
