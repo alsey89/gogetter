@@ -50,8 +50,6 @@ There are 3 levels of configuration, listed in order of precedence:
    - Separator: `.`
    - Refer to the [example.go](./example.go) file for an example.
 
-Refer to the [config.yaml](./config.yaml) for a working example.
-
 ### Injection
 
 Refer to [example.go](./example.go) for a working example.
@@ -68,7 +66,13 @@ To use the CLI tool, install it first:
 go install github.com/alsey89/gogetter/cmd/gogetter@latest
 ```
 
-#### Init
+### Commands
+
+- [init](#gogetter-init)
+- [run](#gogetter-run)
+- [stop/down](#gogetter-stop)
+
+#### Init {#gogetter-init}
 
 Init initializes the project. It sets up go module, creates a main.go file and installs the relevant dependencies. Optionally, it can set up a Dockerfile, a docker-compose.yaml, and git.
 
@@ -90,7 +94,7 @@ Here's an example of the process:
 ? Do you want a docker-compose setup for local development? This will set up a docker-compose file for a local postgres and server with volume mapping. You can add the frontend yourself if you want. Yes
 ```
 
-#### Run
+#### Run {#gogetter-run}
 
 Run spins up the docker-compose service, defaulting to a dev setup with automatic rebuild and reload.
 
@@ -107,6 +111,20 @@ Arguments:
 
 Effects:
 Check the [Dockerfile template](./cmd/templates/Dockerfile.tpl) to see how the BUILD_ENV affects the container setup.
+
+#### Stop/Down {#gogetter-stop}
+
+Stop/Down spins down running docker-compose service and removes orphans.
+
+```
+gogetter stop
+```
+
+OR
+
+```
+gogetter down
+```
 
 ### Troubleshooting
 
