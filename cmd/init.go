@@ -11,7 +11,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// initCmd represents the init command
+func init() {
+	rootCmd.AddCommand(initCmd)
+}
+
 var initCmd = &cobra.Command{
 	Use:   "init", //"init <project-name> [--path <path>]"
 	Short: "Init command is used to initialize a new Go project.",
@@ -25,10 +28,6 @@ var initCmd = &cobra.Command{
 
 		setUpProject()
 	},
-}
-
-func init() {
-	rootCmd.AddCommand(initCmd)
 }
 
 // ----------------------------------------------------------------------------
@@ -66,7 +65,7 @@ func gatherRequirements() *ProjectConfig {
 		IncludeHTTPServer: true,
 	}
 
-	// greeting message
+	//----- greeting message -----
 	boolResult, err = survey.SelectYesNo("Welcome to the GoGetter CLI. This will begin the setup process for your new Go service. Continue?", true)
 	if !boolResult {
 		log.Fatal("Exiting setup process.")
@@ -75,7 +74,7 @@ func gatherRequirements() *ProjectConfig {
 		log.Fatalf("Error: %v", err)
 	}
 
-	// project name
+	//----- project name -----
 	stringResult, err = survey.InputText("Enter the go module name for your project. [Example: github.com/alsey89/gogetter]", true)
 	if err != nil {
 		log.Fatalf("Error: %v", err)
@@ -85,7 +84,7 @@ func gatherRequirements() *ProjectConfig {
 	}
 	c.Module = *stringResult
 
-	// project directory
+	//----- project directory -----
 	stringResult, err = survey.InputText("Enter the directory for your project. Service will be initiated at the current directory if left empty.", false)
 	if err != nil {
 		log.Fatalf("Error: %v", err)
@@ -96,47 +95,55 @@ func gatherRequirements() *ProjectConfig {
 		c.Dir = *stringResult
 	}
 
-	// project modules
-	boolResult, err = survey.SelectYesNo("Do you want to include a JWT middleware module?", true)
+	//----- project modules -----
+	boolResult, err = survey.SelectYesNo("Do you want to include a Echo-JWT middleware module?", true)
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
 	c.IncludeJWTMiddleware = boolResult
 
-	boolResult, err = survey.SelectYesNo("Do you want to include a database module with Postgres and GORM?", true)
+	boolResult, err = survey.SelectYesNo("Do you want to include a GORM Postgres database connector module?", true)
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
 	c.IncludeDBConnector = boolResult
 
-	boolResult, err = survey.SelectYesNo("Do you want to include a mailer module using Gomail?", true)
+	boolResult, err = survey.SelectYesNo("Do you want to include a GoMail mailer module?", true)
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
 	c.IncludeMailer = boolResult
 
-	// git setup
+	//----- git setup -----
 	boolResult, err = survey.SelectYesNo("Do you want to set up git for the project?", true)
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
 	c.SetUpGit = boolResult
 
-	// docker setup
-	boolResult, err = survey.SelectYesNo("Do you want to set up docker for the project?", true)
+	//----- docker setup -----
+	boolResult, err = survey.SelectYesNo("Do you want to set up Dockerfile for the project? Note: if no is selected, docker-compose setup will be skipped", true)
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
 	c.SetUpDockerFile = boolResult
 
-	// docker-compose setup
-	boolResult, err = survey.SelectYesNo("Do you want a docker-compose setup for local development? This will set up a docker-compose file for a local postgres and server with volume mapping. You can add the frontend yourself if you want.", true)
-	if err != nil {
-		log.Fatalf("Error: %v", err)
+	//----- docker-compose setup -----
+	if !c.SetUpDockerFile {
+		_, err = survey.SelectYesNo("Notice: docker-compose setup will be skipped because it's dependent on Dockerfile.", true)
+		if err != nil {
+			log.Fatalf("Error: %v", err)
+		}
+		c.SetUpDockerCompose = false
+		return c
+	} else {
+		boolResult, err = survey.SelectYesNo("Do you want a docker-compose setup for local development? This will set up a docker-compose file for a local postgres and server with volume mapping. You can add the frontend yourself if you want.", true)
+		if err != nil {
+			log.Fatalf("Error: %v", err)
+		}
+		c.SetUpDockerCompose = boolResult
+		return c
 	}
-	c.SetUpDockerCompose = boolResult
-
-	return c
 }
 
 func executeSetup(config *ProjectConfig) {

@@ -13,9 +13,9 @@ import (
 var configuration *config.Module
 
 func init() {
+	//! CONFIG PRECEDENCE: ENV > CONFIG FILE > FALLBACK
 	config.SetSystemLogLevel("debug")
 	configuration = config.SetUpConfig("SERVER", "yaml")
-	//! CONFIG PRECEDENCE: ENV > CONFIG FILE > FALLBACK
 	configuration.SetFallbackConfigs(map[string]interface{}{
 		"server.host":      "0.0.0.0",
 		"server.port":      3001,
@@ -28,6 +28,7 @@ func init() {
 		"server.csrf_secure":     false,
 		"server.csrf_domain":     "localhost",
 
+		// Database
 		"database.host":         "postgres",
 		"database.port":         5432,
 		"database.dbname":       "postgres",
@@ -37,12 +38,14 @@ func init() {
 		"databse.loglevel":      "error",
 		"database.auto_migrate": false,
 
+		// Mailer
 		"mailer.host":         "smtp.gmail.com",
 		"mailer.port":         587,
 		"mailer.username":     "example@example-gmail.com",
 		"mailer.app_password": "foo bar baz qux",
 		"mailer.tls":          true,
 
+		// Echo JWT
 		"echo_jwt.signing_key":    "authsecret",
 		"echo_jwt.token_lookup":   "cookie:jwt",
 		"echo_jwt.signing_method": "HS256",
@@ -56,7 +59,6 @@ func main() {
 		server.InitiateModule("server"),
 		// postgres.InitiateModuleAndSchema(
 		// 	"database",
-		// // ...schema,
 		// // schema.User{},
 		// // schema.ContactInfo{},
 		// // schema.EmergencyContact{},

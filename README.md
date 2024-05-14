@@ -43,7 +43,7 @@ There are 3 levels of configuration, listed in order of precedence:
 
 ### Injection
 
-Refer to the template/example file for a working example.
+Refer to [example.go](./example.go) for a working example.
 
 ### Per Module Documentation
 
@@ -63,7 +63,7 @@ go install github.com/alsey89/gogetter/cmd/gogetter@latest
 
 #### Init
 
-Init initializes the project. It sets up go module, creates a main.go file and installs the relevant dependencies.
+Init initializes the project. It sets up go module, creates a main.go file and installs the relevant dependencies. Optionally, it can set up a Dockerfile, a docker-compose.yaml, and git.
 
 ```
 gogetter init
