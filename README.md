@@ -40,12 +40,17 @@ There are 3 levels of configuration, listed in order of precedence:
 1. **Environmental variables**:
    - Format: `prefix_scope_key`
    - Separator: `_` (underscore)
+   - Refer to the [docker-compose template](./cmd/templates/docker-compose.yaml.tpl) for an example.
 2. **Config Files**
    - Format: `scope.key`
    - Separator: `.`
+   - Refer to the [config.yaml](./config.yaml) for an example.
 3. **Fallback Config**
    - Format: `scope.key`
    - Separator: `.`
+   - Refer to the [example.go](./example.go) file for an example.
+
+Refer to the [config.yaml](./config.yaml) for a working example.
 
 ### Injection
 
