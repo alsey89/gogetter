@@ -2,21 +2,20 @@ package cmd
 
 import (
 	"embed"
-	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"text/template"
 
-	"github.com/AlecAivazis/survey/v2"
+	"github.com/alsey89/gogetter/cmd/survey"
 	"github.com/spf13/cobra"
 )
 
 // initCmd represents the init command
 var initCmd = &cobra.Command{
-	Use:   "init <project-name> [--path <path>]",
+	Use:   "init", //"init <project-name> [--path <path>]"
 	Short: "Init command is used to initialize a new Go project.",
-	Long:  `Init command is used to initialize a new Go project. It creates a new directory with the project name and initializes a new Go module in it.`,
+	Long:  `Init command is used to initialize a new Go project. It initializes go mod, creates a main.go file, and optionally sets up optional modules, git, docker and docker-compose.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// check if go mod already exists in the directory
 		_, err := os.Stat("go.mod")
@@ -36,7 +35,7 @@ func init() {
 
 type ProjectConfig struct {
 	Module string
-	Path   string
+	Dir    string
 	// mandatory modules
 	IncludeLogger     bool
 	IncludeConfig     bool
@@ -46,45 +45,118 @@ type ProjectConfig struct {
 	IncludeDBConnector   bool
 	IncludeMailer        bool
 
-	SetUpGit        bool
-	SetUpDockerFile bool
+	SetUpGit           bool
+	SetUpDockerFile    bool
+	SetUpDockerCompose bool
 }
 
 func setUpProject() {
-	// greeting message
-	if !selectYesNo("Welcome to the GoGetter CLI. This will begin the setup process for your new Go service. Continue?", true) {
-		fmt.Println("Project setup cancelled.")
-		return
-	}
+	config := gatherRequirements()
+	executeSetup(config)
+}
 
-	//* Collect Project Configurations
+func gatherRequirements() *ProjectConfig {
+	var err error
+	var boolResult bool
+	var stringResult *string
+
 	c := &ProjectConfig{
 		IncludeLogger:     true,
 		IncludeConfig:     true,
 		IncludeHTTPServer: true,
 	}
 
+	// greeting message
+	boolResult, err = survey.SelectYesNo("Welcome to the GoGetter CLI. This will begin the setup process for your new Go service. Continue?", true)
+	if !boolResult {
+		log.Fatal("Exiting setup process.")
+	}
+	if err != nil {
+		log.Fatalf("Error: %v", err)
+	}
+
 	// project name
-	c.Module = inputText("Enter the go module name for your project. [Example: github.com/alsey89/gogetter]", true)
+	stringResult, err = survey.InputText("Enter the go module name for your project. [Example: github.com/alsey89/gogetter]", true)
+	if err != nil {
+		log.Fatalf("Error: %v", err)
+	}
+	if stringResult == nil {
+		log.Fatalf("Project name is required.")
+	}
+	c.Module = *stringResult
 
 	// project directory
-	c.Path = inputText("Enter the path for your project. Service will be initiated at the current directory if left empty.", false)
+	stringResult, err = survey.InputText("Enter the directory for your project. Service will be initiated at the current directory if left empty.", false)
+	if err != nil {
+		log.Fatalf("Error: %v", err)
+	}
+	if stringResult == nil {
+		c.Dir = ""
+	} else {
+		c.Dir = *stringResult
+	}
 
 	// project modules
-	c.IncludeJWTMiddleware = selectYesNo("Do you want to include a JWT middleware module?", true)
-	c.IncludeDBConnector = selectYesNo("Do you want to include a database module with Postgres and GORM?", true)
-	c.IncludeMailer = selectYesNo("Do you want to include a mailer module using Gomail?", true)
+	boolResult, err = survey.SelectYesNo("Do you want to include a JWT middleware module?", true)
+	if err != nil {
+		log.Fatalf("Error: %v", err)
+	}
+	c.IncludeJWTMiddleware = boolResult
+
+	boolResult, err = survey.SelectYesNo("Do you want to include a database module with Postgres and GORM?", true)
+	if err != nil {
+		log.Fatalf("Error: %v", err)
+	}
+	c.IncludeDBConnector = boolResult
+
+	boolResult, err = survey.SelectYesNo("Do you want to include a mailer module using Gomail?", true)
+	if err != nil {
+		log.Fatalf("Error: %v", err)
+	}
+	c.IncludeMailer = boolResult
 
 	// git setup
-	c.SetUpGit = selectYesNo("Do you want to set up git for the project?", true)
-	// docker setup
-	c.SetUpDockerFile = selectYesNo("Do you want to set up docker for the project?", true)
+	boolResult, err = survey.SelectYesNo("Do you want to set up git for the project?", true)
+	if err != nil {
+		log.Fatalf("Error: %v", err)
+	}
+	c.SetUpGit = boolResult
 
-	executeSetup(c)
+	// docker setup
+	boolResult, err = survey.SelectYesNo("Do you want to set up docker for the project?", true)
+	if err != nil {
+		log.Fatalf("Error: %v", err)
+	}
+	c.SetUpDockerFile = boolResult
+
+	// docker-compose setup
+	boolResult, err = survey.SelectYesNo("Do you want a docker-compose setup for local development? This will set up a docker-compose file for a local postgres and server with volume mapping. You can add the frontend yourself if you want.", true)
+	if err != nil {
+		log.Fatalf("Error: %v", err)
+	}
+	c.SetUpDockerCompose = boolResult
+
+	return c
 }
 
 func executeSetup(config *ProjectConfig) {
 	var err error
+
+	if config.Dir != "" {
+		if _, err := os.Stat(config.Dir); os.IsNotExist(err) {
+			err = os.Mkdir(config.Dir, 0755)
+			if err != nil {
+				log.Fatalf("Error creating directory: %v", err)
+			}
+		} else {
+			log.Fatalf("Directory already exists: %s", config.Dir)
+		}
+
+		err = os.Chdir(config.Dir)
+		if err != nil {
+			log.Fatalf("Error changing directory: %v", err)
+		}
+	}
 
 	err = createGoModule(config.Module)
 	if err != nil {
@@ -109,6 +181,13 @@ func executeSetup(config *ProjectConfig) {
 			log.Fatalf("Error creating Git repository: %v", err)
 		}
 	}
+
+	if config.SetUpDockerCompose {
+		err = createDockerCompose()
+		if err != nil {
+			log.Fatalf("Error creating Docker Compose file: %v", err)
+		}
+	}
 }
 
 func createGoModule(name string) error {
@@ -130,7 +209,6 @@ func createGoModule(name string) error {
 var templateFS embed.FS
 
 func createMainFile(c *ProjectConfig) error {
-	// Using the embedded file system to access the template
 	tmpl, err := template.ParseFS(templateFS, "templates/main.go.tpl")
 	if err != nil {
 		log.Printf("Failed to parse template: %v", err)
@@ -144,13 +222,11 @@ func createMainFile(c *ProjectConfig) error {
 	}
 	defer file.Close()
 
-	// Execute the template with the project configuration
 	if err := tmpl.Execute(file, c); err != nil {
 		log.Printf("Failed to execute template: %v", err)
 		return err
 	}
 
-	// run go mod init <name>
 	cmd := exec.Command("go", "mod", "tidy")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -165,7 +241,6 @@ func createMainFile(c *ProjectConfig) error {
 func createDockerfile() error {
 	templatePath := "templates/Dockerfile.tpl"
 
-	// Using the embedded file system to access the template
 	tmpl, err := template.ParseFS(templateFS, templatePath)
 	if err != nil {
 		log.Printf("Failed to parse template: %v", err)
@@ -179,7 +254,6 @@ func createDockerfile() error {
 	}
 	defer file.Close()
 
-	// Execute the template with the project configuration
 	if err := tmpl.Execute(file, nil); err != nil {
 		log.Printf("Failed to execute template: %v", err)
 		return err
@@ -189,10 +263,8 @@ func createDockerfile() error {
 }
 
 func createGitRepository() error {
-	// Create a new Git repository
 	log.Printf("Creating a new Git repository\n")
 
-	// run git init
 	cmd := exec.Command("git", "init")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -201,7 +273,6 @@ func createGitRepository() error {
 		return err
 	}
 
-	// create .gitignore file
 	file, err := os.Create(".gitignore")
 	if err != nil {
 		log.Printf("Failed to create file: %v", err)
@@ -215,7 +286,8 @@ func createGitRepository() error {
 		return err
 	}
 
-	if err := tmpl.Execute(file, nil); err != nil {
+	err = tmpl.Execute(file, nil)
+	if err != nil {
 		log.Printf("Failed to execute template: %v", err)
 		return err
 	}
@@ -223,82 +295,26 @@ func createGitRepository() error {
 	return nil
 }
 
-// ----------------------------------------------------------------------------
+func createDockerCompose() error {
+	templatePath := "templates/docker-compose.yaml.tpl"
 
-func selectMultipleOptions(message string, options []string) []string {
-	var selectedOptions []string
-
-	// set up multi select prompt
-	prompt := &survey.MultiSelect{
-		Message: message,
-		Options: options,
-		Help:    "Use the arrow keys to navigate and space to select. Press enter when done.",
-	}
-
-	// run the prompt, save result to selectedOptions
-	err := survey.AskOne(prompt, &selectedOptions)
+	tmpl, err := template.ParseFS(templateFS, templatePath)
 	if err != nil {
-		log.Fatalf("Failed to select options: %v", err)
+		log.Printf("Failed to parse template: %v", err)
+		return err
 	}
 
-	return selectedOptions
-}
-
-func selectOneOption(message string, options []string) string {
-	var selectedOption string
-
-	// set up select prompt
-	prompt := &survey.Select{
-		Message: message,
-		Options: options,
-		Help:    "Use the arrow keys to navigate and space to select. Press enter when done.",
-	}
-
-	// run the prompt, save result to selectedOption
-	err := survey.AskOne(prompt, &selectedOption)
+	file, err := os.Create("docker-compose.yaml")
 	if err != nil {
-		log.Fatalf("Failed to select option: %v", err)
+		log.Printf("Failed to create file: %v", err)
+		return err
+	}
+	defer file.Close()
+
+	if err := tmpl.Execute(file, nil); err != nil {
+		log.Printf("Failed to execute template: %v", err)
+		return err
 	}
 
-	return selectedOption
-}
-
-func selectYesNo(message string, defaultSelection bool) bool {
-	var selectedOption bool
-
-	// set up confirm prompt
-	prompt := &survey.Confirm{
-		Message: message,
-		Default: defaultSelection,
-	}
-
-	// run the prompt, save result to selectedOption
-	err := survey.AskOne(prompt, &selectedOption)
-	if err != nil {
-		log.Fatalf("Failed to select option: %v", err)
-	}
-
-	return selectedOption
-}
-
-func inputText(message string, isMandatory bool) string {
-	var input string
-	var opts []survey.AskOpt
-
-	prompt := &survey.Input{
-		Message: message,
-	}
-
-	if isMandatory {
-		// this makes the input a required field
-		opts = append(opts, survey.WithValidator(survey.Required))
-	}
-
-	// run the prompt, save result to input
-	err := survey.AskOne(prompt, &input, opts...)
-	if err != nil {
-		log.Fatalf("Failed to input text: %v", err)
-	}
-
-	return input
+	return nil
 }

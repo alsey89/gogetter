@@ -1,4 +1,4 @@
-package cmd
+package survey
 
 import (
 	"log"
@@ -6,63 +6,57 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 )
 
-func SelectMultipleOptions(message string, options []string) []string {
+func SelectMultipleOptions(message string, options []string) ([]string, error) {
 	var selectedOptions []string
 
-	// set up multi select prompt
 	prompt := &survey.MultiSelect{
 		Message: message,
 		Options: options,
 		Help:    "Use the arrow keys to navigate and space to select. Press enter when done.",
 	}
 
-	// run the prompt, save result to selectedOptions
 	err := survey.AskOne(prompt, &selectedOptions)
 	if err != nil {
-		log.Fatalf("Failed to select options: %v", err)
+		return nil, err
 	}
 
-	return selectedOptions
+	return selectedOptions, nil
 }
 
-func SelectOneOption(message string, options []string) string {
+func SelectOneOption(message string, options []string) (*string, error) {
 	var selectedOption string
 
-	// set up select prompt
 	prompt := &survey.Select{
 		Message: message,
 		Options: options,
 		Help:    "Use the arrow keys to navigate and space to select. Press enter when done.",
 	}
 
-	// run the prompt, save result to selectedOption
 	err := survey.AskOne(prompt, &selectedOption)
 	if err != nil {
-		log.Fatalf("Failed to select option: %v", err)
+		return nil, err
 	}
 
-	return selectedOption
+	return &selectedOption, nil
 }
 
-func SelectYesNo(message string, defaultSelection bool) bool {
+func SelectYesNo(message string, defaultSelection bool) (bool, error) {
 	var selectedOption bool
 
-	// set up confirm prompt
 	prompt := &survey.Confirm{
 		Message: message,
 		Default: defaultSelection,
 	}
 
-	// run the prompt, save result to selectedOption
 	err := survey.AskOne(prompt, &selectedOption)
 	if err != nil {
-		log.Fatalf("Failed to select option: %v", err)
+		return false, err
 	}
 
-	return selectedOption
+	return selectedOption, nil
 }
 
-func InputText(message string, isMandatory bool) string {
+func InputText(message string, isMandatory bool) (*string, error) {
 	var input string
 	var opts []survey.AskOpt
 
@@ -75,11 +69,10 @@ func InputText(message string, isMandatory bool) string {
 		opts = append(opts, survey.WithValidator(survey.Required))
 	}
 
-	// run the prompt, save result to input
 	err := survey.AskOne(prompt, &input, opts...)
 	if err != nil {
-		log.Fatalf("Failed to input text: %v", err)
+		log.Fatalf("error asking for input: %v", err)
 	}
 
-	return input
+	return &input, nil
 }

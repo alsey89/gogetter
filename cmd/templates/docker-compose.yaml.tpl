@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:latest
+    volumes:
+      - ./database/data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+#   client:
+#     build:
+#       context: ./client
+#       args:
+#         BUILD_ENV: ${BUILD_ENV:-production}
+#     volumes:
+#       - ./client:/app
+#       - /app/node_modules
+#     ports:
+#       - "3000:3000"
+#     environment:
+#       - BUILD_ENV=${BUILD_ENV:-production}
+#     depends_on:
+#       - postgres
+#     networks:
+#       - app-network
+
+  server:
+    build:
+      context: ./
+      args:
+        BUILD_ENV: ${BUILD_ENV:-production}
+    volumes:
+      - ./:/app
+      - /go/pkg/mod
+      - /go/bin
+    ports:
+      - "3001:3001" # Expose for external access
+    environment:
+      - BUILD_ENV=${BUILD_ENV:-production}
+      - SERVER_SERVER_HOST=0.0.0.0
+      - SERVER_SERVER_PORT=3001
+      - SERVER_DATABASE_HOST=postgres
+      - SERVER_DATABASE_PORT=5432
+      - SERVER_DATABASE_DBNAME=postgres
+      - SERVER_DATABASE_USER=postgres
+      - SERVER_DATABASE_PASSWORD=password
+      - SERVER_DATABASE_SSLMODE=prefer
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

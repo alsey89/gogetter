@@ -61,11 +61,45 @@ To use the CLI tool, install it first:
 go install github.com/alsey89/gogetter/cmd/gogetter@latest
 ```
 
-Use the following command to initialize the process:
+#### Init
+
+Init initializes the project. It sets up go module, creates a main.go file and installs the relevant dependencies.
 
 ```
 gogetter init
 ```
+
+Here's an example of how the process goes:
+
+```
+? Welcome to the GoGetter CLI. This will begin the setup process for your new Go service. Continue? Yes
+? Enter the go module name for your project. [Example: github.com/alsey89/gogetter] testproject
+? Enter the directory for your project. Service will be initiated at the current directory if left empty.
+? Do you want to include a JWT middleware module? Yes
+? Do you want to include a database module with Postgres and GORM? Yes
+? Do you want to include a mailer module using Gomail? Yes
+? Do you want to set up git for the project? Yes
+? Do you want to set up docker for the project? Yes
+? Do you want a docker-compose setup for local development? This will set up a docker-compose file for a local postgres and server with volume mapping. You can add the frontend yourself if you want. Yes
+```
+
+#### Run
+
+Run spins up the docker-compose service, defaulting to a dev setup with automatic rebuild and reload.
+
+```
+gogetter run
+```
+
+Arguments:
+
+- dev: sets BUILD_ENV=development
+- development: sets BUILD_ENV=development
+- prod: sets BUILD_ENV=production
+- production: sets BUILD_ENV=production
+
+Effects:
+Check the [Dockerfile template](./cmd/templates/Dockerfile.tpl) to see how the BUILD_ENV affects the container setup.
 
 ### Troubleshooting
 
