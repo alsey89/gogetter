@@ -30,28 +30,10 @@ var initCmd = &cobra.Command{
 	},
 }
 
-// ----------------------------------------------------------------------------
-
-type ProjectConfig struct {
-	Module string
-	Dir    string
-	// mandatory modules
-	IncludeLogger     bool
-	IncludeConfig     bool
-	IncludeHTTPServer bool
-	// optional modules
-	IncludeJWTMiddleware bool
-	IncludeDBConnector   bool
-	IncludeMailer        bool
-
-	SetUpGit           bool
-	SetUpDockerFile    bool
-	SetUpDockerCompose bool
-}
-
 func setUpProject() {
 	config := gatherRequirements()
 	executeSetup(config)
+	saveConfig(config)
 }
 
 func gatherRequirements() *ProjectConfig {
@@ -60,9 +42,14 @@ func gatherRequirements() *ProjectConfig {
 	var stringResult *string
 
 	c := &ProjectConfig{
-		IncludeLogger:     true,
-		IncludeConfig:     true,
+		IncludeLogger: true,
+		Logger:        "zap",
+
+		IncludeConfig: true,
+		ConfigManager: "viper",
+
 		IncludeHTTPServer: true,
+		Framework:         "echo",
 	}
 
 	//----- greeting message -----
@@ -96,23 +83,33 @@ func gatherRequirements() *ProjectConfig {
 	}
 
 	//----- project modules -----
-	boolResult, err = survey.SelectYesNo("Do you want to include a Echo-JWT middleware module?", true)
+
+	// JWT middleware
+	boolResult, err = survey.SelectYesNo("Do you want to include a JWT middleware module?", true)
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
 	c.IncludeJWTMiddleware = boolResult
+	//todo: offer different JWT middleware options
+	c.JWTMiddleware = "echo"
 
+	// DB connector
 	boolResult, err = survey.SelectYesNo("Do you want to include a GORM Postgres database connector module?", true)
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
 	c.IncludeDBConnector = boolResult
+	//todo: offer different DB connector options
+	c.DBConnector = "postgres"
 
+	// Mailer
 	boolResult, err = survey.SelectYesNo("Do you want to include a GoMail mailer module?", true)
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
 	c.IncludeMailer = boolResult
+	//todo: offer different mailer options
+	c.Mailer = "gomail"
 
 	//----- git setup -----
 	boolResult, err = survey.SelectYesNo("Do you want to set up git for the project?", true)
@@ -243,6 +240,26 @@ func createMainFile(c *ProjectConfig) error {
 	}
 
 	return nil
+}
+
+func saveConfig(config *ProjectConfig) {
+	tpl, err := template.ParseFS(templateFS, "templates/gogetter.yaml.tpl")
+	if err != nil {
+		log.Fatalf("Failed to parse template: %v", err)
+	}
+
+	file, err := os.Create("gogetter.yaml")
+	if err != nil {
+		log.Fatalf("Failed to create config file: %v", err)
+	}
+	defer file.Close()
+
+	err = tpl.Execute(file, config)
+	if err != nil {
+		log.Fatalf("Failed to execute template: %v", err)
+	}
+
+	log.Println("Configuration saved to gogetter.yaml")
 }
 
 func createDockerfile() error {
