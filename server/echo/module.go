@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	echojwt "github.com/labstack/echo-jwt"
+	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/spf13/viper"
