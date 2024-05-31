@@ -1,4 +1,4 @@
-package echo
+package server
 
 import (
 	"context"
@@ -8,14 +8,13 @@ import (
 	"strings"
 	"time"
 
-	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
-	"github.com/alsey89/gogetter/common"
+	"github.com/alsey89/gogetter/pkg/common"
 )
 
 const (
@@ -259,42 +258,6 @@ func (m *Module) startServer(HideBanner bool, HidePort bool) {
 
 func (m *Module) GetServer() *echo.Echo {
 	return m.server
-}
-
-/*
-Returns a pointer to an echo.MiddlewareFunc that provides JWT authentication middleware for Echo framework.
-Middleware validates the JWT token, parses claims, and stores them in context under the key "user".
-Takes in signing key, signing method, and token lookup.
-
-	Example/Default values:
-	- SigningKey = "secret"
-	- SigningMethod = "HS256"
-	- TokenLookup = "cookie:jwt"
-*/
-func (m *Module) GetEchoJWTMiddleware(signingKey string, signingMethod string, tokenLookup string) *echo.MiddlewareFunc {
-	config := echojwt.Config{}
-
-	if signingKey == "" {
-		config.SigningKey = []byte(DefaultSigningKey)
-	} else {
-		config.SigningKey = []byte(signingKey)
-	}
-
-	if signingMethod == "" {
-		config.SigningMethod = DefaultSigningMethod
-	} else {
-		config.SigningMethod = signingMethod
-	}
-
-	if tokenLookup == "" {
-		config.TokenLookup = DefaultTokenLookup
-	} else {
-		config.TokenLookup = tokenLookup
-	}
-
-	middleware := echojwt.WithConfig(config)
-
-	return &middleware
 }
 
 func (m *Module) PrintDebugLogs() {

@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/gomail.v2"
 
-	"github.com/alsey89/gogetter/common"
+	"github.com/alsey89/gogetter/pkg/common"
 )
 
 const (
@@ -80,7 +80,6 @@ func InitiateModule(scope string) fx.Option {
 			return m
 		}),
 	)
-
 }
 
 func loadConfig(scope string) *Config {
@@ -104,12 +103,12 @@ func loadConfig(scope string) *Config {
 func (m *Module) onStart(ctx context.Context) error {
 	m.logger.Info("Mailer initiated")
 
-	err := m.TestSMTPConnection()
+	err := m.testSMTPConnection()
 	if err != nil {
 		m.logger.Error("Failed to connect to the SMTP server", zap.Error(err))
 	}
 
-	m.PrintDebugLogs()
+	m.printDebugLogs()
 
 	return nil
 }
@@ -118,6 +117,48 @@ func (m *Module) onStop(ctx context.Context) error {
 
 	m.logger.Info("Mailer module stopped")
 
+	return nil
+}
+
+// ----------------------------------------------------------
+
+func (m *Module) printDebugLogs() {
+	//* Debug logs
+	m.logger.Debug("----- Mailer Configuration -----")
+	m.logger.Debug("Host", zap.String("Host", m.config.Host))
+	m.logger.Debug("Port", zap.Int("Port", m.config.Port))
+	m.logger.Debug("Username", zap.String("Username", m.config.Username))
+	m.logger.Debug("AppPassword", zap.String("AppPassword", m.config.AppPassword))
+	m.logger.Debug("TLS", zap.Bool("TLS", m.config.TLS))
+}
+
+func (m *Module) testSMTPConnection() error {
+	m.logger.Info("Testing SMTP connection...")
+	s, err := m.dialer.Dial()
+	if err != nil {
+		m.logger.Error("Failed to connect to the SMTP server", zap.Error(err))
+		return err
+	}
+	defer s.Close()
+
+	m.logger.Info("Successfully connected to the SMTP server.")
+	return nil
+}
+
+func (m *Module) SendTestMail(to, subject, body string) error {
+	msg := m.NewMessage()
+	msg.SetHeader("From", DefaultFrom)
+	msg.SetHeader("To", to)
+	msg.SetHeader("Subject", subject)
+	msg.SetBody("text/html", body)
+
+	err := m.Send(msg)
+	if err != nil {
+		m.logger.Error("Failed to send test email", zap.Error(err))
+		return err
+	}
+
+	m.logger.Info("Test email sent successfully.")
 	return nil
 }
 
@@ -146,47 +187,5 @@ func (m *Module) SendTransactionalMail(from string, to string, subject string, b
 	}
 
 	m.logger.Info("Email sent successfully.")
-	return nil
-}
-
-// ----------------------------------------------------------
-
-func (m *Module) PrintDebugLogs() {
-	//* Debug logs
-	m.logger.Debug("----- Mailer Configuration -----")
-	m.logger.Debug("Host", zap.String("Host", m.config.Host))
-	m.logger.Debug("Port", zap.Int("Port", m.config.Port))
-	m.logger.Debug("Username", zap.String("Username", m.config.Username))
-	m.logger.Debug("AppPassword", zap.String("AppPassword", m.config.AppPassword))
-	m.logger.Debug("TLS", zap.Bool("TLS", m.config.TLS))
-}
-
-func (m *Module) TestSMTPConnection() error {
-	m.logger.Info("Testing SMTP connection...")
-	s, err := m.dialer.Dial()
-	if err != nil {
-		m.logger.Error("Failed to connect to the SMTP server", zap.Error(err))
-		return err
-	}
-	defer s.Close()
-
-	m.logger.Info("Successfully connected to the SMTP server.")
-	return nil
-}
-
-func (m *Module) SendTestMail(to, subject, body string) error {
-	msg := m.NewMessage()
-	msg.SetHeader("From", DefaultFrom)
-	msg.SetHeader("To", to)
-	msg.SetHeader("Subject", subject)
-	msg.SetBody("text/html", body)
-
-	err := m.Send(msg)
-	if err != nil {
-		m.logger.Error("Failed to send test email", zap.Error(err))
-		return err
-	}
-
-	m.logger.Info("Test email sent successfully.")
 	return nil
 }

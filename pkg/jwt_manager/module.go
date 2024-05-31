@@ -1,4 +1,4 @@
-package jwt
+package jwt_manager
 
 import (
 	"context"
@@ -6,12 +6,16 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	echojwt "github.com/labstack/echo-jwt/v4"
+	"github.com/labstack/echo/v4"
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
-	"github.com/alsey89/gogetter/common"
+	"github.com/alsey89/gogetter/pkg/common"
 )
+
+// ----------------------------------------------
 
 const (
 	defaultSigningKey    = "secret"
@@ -39,6 +43,8 @@ type Params struct {
 	Logger    *zap.Logger
 	Lifecycle fx.Lifecycle
 }
+
+// ----------------------------------------------
 
 /*
 Initializes the JWT module with the provided jwtScopes.
@@ -109,9 +115,6 @@ func (m *Module) onStop(ctx context.Context) error {
 	return nil
 }
 
-/*
-Prints debug logs for all configurations.
-*/
 func (m *Module) PrintDebugLogs() {
 	for scope, config := range m.configs {
 		m.logger.Debug("----- JWT Module Configuration -----", zap.String("Scope", scope))
@@ -122,27 +125,40 @@ func (m *Module) PrintDebugLogs() {
 	}
 }
 
+// ----------------------------------------------
+
+/*
+Retrieves the configuration for a specific scope.
+*/
+func (m *Module) GetConfig(scope string) (*Config, error) {
+	config, exists := m.configs[scope]
+	if !exists {
+		return nil, fmt.Errorf("config for scope %s not found", scope)
+	}
+	return config, nil
+}
+
 /*
 Generates a JWT token with the provided additional claims for a specific scope.
 Use jwt.MapClaims from "github.com/golang-jwt/jwt/v5"
 */
 func (m *Module) GenerateToken(scope string, additionalClaims jwt.MapClaims) (*string, error) {
-	config, exists := m.configs[scope]
-	if !exists {
+	scopedConfig, err := m.GetConfig(scope)
+	if err != nil {
 		m.logger.Error("Config not found", zap.String("Scope", scope))
-		return nil, fmt.Errorf("config for scope %s not found", scope)
+		return nil, err
 	}
 
 	claims := jwt.MapClaims{
-		"exp": jwt.NewNumericDate(time.Now().Add(time.Hour * time.Duration(config.ExpInHours))),
+		"exp": jwt.NewNumericDate(time.Now().Add(time.Hour * time.Duration(scopedConfig.ExpInHours))),
 	}
 
 	for key, value := range additionalClaims {
 		claims[key] = value
 	}
 
-	token := jwt.NewWithClaims(jwt.GetSigningMethod(config.SigningMethod), claims)
-	t, err := token.SignedString([]byte(config.SigningKey))
+	token := jwt.NewWithClaims(jwt.GetSigningMethod(scopedConfig.SigningMethod), claims)
+	t, err := token.SignedString([]byte(scopedConfig.SigningKey))
 	if err != nil {
 		m.logger.Error("Failed to generate token", zap.Error(err))
 		return nil, err
@@ -154,18 +170,18 @@ func (m *Module) GenerateToken(scope string, additionalClaims jwt.MapClaims) (*s
 parse JWT token for a specific scope
 */
 func (m *Module) ParseToken(scope string, tokenString string) (jwt.MapClaims, error) {
-	config, exists := m.configs[scope]
-	if !exists {
+	scopedConfig, err := m.GetConfig(scope)
+	if err != nil {
 		m.logger.Error("Config not found", zap.String("Scope", scope))
-		return nil, fmt.Errorf("config for scope %s not found", scope)
+		return nil, err
 	}
 
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if jwt.GetSigningMethod(config.SigningMethod) != token.Method {
+		if jwt.GetSigningMethod(scopedConfig.SigningMethod) != token.Method {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return []byte(config.SigningKey), nil
-	}, jwt.WithValidMethods([]string{config.SigningMethod}))
+		return []byte(scopedConfig.SigningKey), nil
+	}, jwt.WithValidMethods([]string{scopedConfig.SigningMethod}))
 
 	if err != nil {
 		m.logger.Error("Failed to parse token", zap.Error(err))
@@ -185,13 +201,22 @@ func (m *Module) ParseToken(scope string, tokenString string) (jwt.MapClaims, er
 	return claims, nil
 }
 
+// ----------------------------------------------
+
 /*
-Retrieves the configuration for a specific scope.
+Returns a pointer to an echo.MiddlewareFunc that provides JWT authentication middleware for Echo framework.
+Middleware validates the JWT token, parses claims, and stores them in context under the key "user".
 */
-func (m *Module) GetConfig(scope string) (*Config, error) {
-	config, exists := m.configs[scope]
-	if !exists {
-		return nil, fmt.Errorf("config for scope %s not found", scope)
+func (m *Module) GetJWTMiddleware(scope string) echo.MiddlewareFunc {
+	scopedConfig, err := m.GetConfig(scope)
+	if err != nil {
+		m.logger.Error("Config not found", zap.String("Scope", scope))
+		return nil
 	}
-	return config, nil
+
+	return echojwt.WithConfig(echojwt.Config{
+		SigningKey:    []byte(scopedConfig.SigningKey),
+		SigningMethod: scopedConfig.SigningMethod,
+		TokenLookup:   scopedConfig.TokenLookup,
+	})
 }

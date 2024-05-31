@@ -1,4 +1,4 @@
-package database
+package pg_connector
 
 import (
 	"testing"
@@ -10,24 +10,24 @@ import (
 
 func TestConfigs(t *testing.T) {
 	t.Run("TestLoadConfig", func(t *testing.T) {
-		// Set config values for testing
-		viper.Set("test_mysql_db.host", "testhost")
-		viper.Set("test_mysql_db.port", 3306)
-		viper.Set("test_mysql_db.dbname", "testdb")
-		viper.Set("test_mysql_db.user", "testuser")
-		viper.Set("test_mysql_db.password", "testpassword")
-		viper.Set("test_mysql_db.sslmode", "true")
-		viper.Set("test_mysql_db.log_level", "debug")
-		viper.Set("test_mysql_db.auto_migrate", true)
+		// set config values
+		viper.Set("test_postgres_db.host", "testhost")
+		viper.Set("test_postgres_db.port", 1234)
+		viper.Set("test_postgres_db.dbname", "testdb")
+		viper.Set("test_postgres_db.user", "testuser")
+		viper.Set("test_postgres_db.password", "testpassword")
+		viper.Set("test_postgres_db.sslmode", "testssl")
+		viper.Set("test_postgres_db.log_level", "debug")
+		viper.Set("test_postgres_db.auto_migrate", true)
 
-		config := loadConfig("test_mysql_db")
+		config := loadConfig("test_postgres_db")
 
 		assert.Equal(t, "testhost", config.Host)
-		assert.Equal(t, 3306, config.Port)
+		assert.Equal(t, 1234, config.Port)
 		assert.Equal(t, "testdb", config.DBName)
 		assert.Equal(t, "testuser", config.User)
 		assert.Equal(t, "testpassword", config.Password)
-		assert.Equal(t, "true", config.SSLMode)
+		assert.Equal(t, "testssl", config.SSLMode)
 		assert.Equal(t, "debug", config.LogLevel)
 		assert.True(t, config.AutoMigrate)
 
@@ -35,8 +35,8 @@ func TestConfigs(t *testing.T) {
 	})
 
 	t.Run("TestLoadConfigDefaults", func(t *testing.T) {
-		// Load config without setting values to test defaults
-		config := loadConfig("test_mysql_db")
+		//load config without config values
+		config := loadConfig("test_postgres_db")
 
 		assert.Equal(t, DefaultHost, config.Host)
 		assert.Equal(t, DefaultPort, config.Port)
@@ -55,15 +55,15 @@ func TestGetConnectionStringFromConfig(t *testing.T) {
 	d := &Module{
 		config: &Config{
 			Host:     "testhost",
-			Port:     3306,
+			Port:     1234,
 			User:     "testuser",
 			Password: "testpassword",
 			DBName:   "testdb",
-			SSLMode:  "true",
+			SSLMode:  "testssl",
 		},
 	}
 
-	expected := "root:testpassword@tcp(testhost:3306)/testdb?charset=utf8mb4&parseTime=True&loc=Local"
+	expected := "host=testhost port=1234 user=testuser password=testpassword dbname=testdb sslmode=testssl"
 	actual := d.getConnectionStringFromConfig()
 
 	assert.Equal(t, expected, actual)

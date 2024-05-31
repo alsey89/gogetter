@@ -1,26 +1,22 @@
 package main
 
 import (
-	"log"
-
 	"go.uber.org/fx"
 
-	config "github.com/alsey89/gogetter/config/viper"
-	jwt "github.com/alsey89/gogetter/jwt"
-	logger "github.com/alsey89/gogetter/logging/zap"
-	mailer "github.com/alsey89/gogetter/mail/gomail"
-	server "github.com/alsey89/gogetter/server/echo"
-
-	jwtv5 "github.com/golang-jwt/jwt/v5"
+	"github.com/alsey89/gogetter/pkg/config_manager"
+	"github.com/alsey89/gogetter/pkg/jwt_manager"
+	"github.com/alsey89/gogetter/pkg/logger"
+	"github.com/alsey89/gogetter/pkg/mailer"
+	"github.com/alsey89/gogetter/pkg/server"
 )
 
-var configuration *config.Module
+var config *config_manager.Module
 
 func init() {
 	//! CONFIG PRECEDENCE: ENV > CONFIG FILE > FALLBACK
-	config.SetSystemLogLevel("debug")
-	configuration = config.SetUpConfig("SERVER", "yaml")
-	configuration.SetFallbackConfigs(map[string]interface{}{
+	config_manager.SetSystemLogLevel("debug")
+	config = config_manager.SetUpConfig("SERVER", "yaml")
+	config.SetFallbackConfigs(map[string]interface{}{
 		"server.host":      "0.0.0.0",
 		"server.port":      3001,
 		"server.log_level": "DEV",
@@ -49,7 +45,7 @@ func init() {
 		"mailer.app_password": "foo bar baz qux",
 		"mailer.tls":          true,
 
-		// Echo JWT
+		// JWT Manager
 		"jwt_auth.signing_key":    "authsecret",
 		"jwt_auth.token_lookup":   "cookie:jwt",
 		"jwt_auth.signing_method": "HS256",
@@ -68,16 +64,16 @@ func init() {
 }
 func main() {
 	app := fx.New(
-		fx.Supply(configuration),
+		fx.Supply(config),
 		logger.InitiateModule(),
 		server.InitiateModule("server"),
-		// postgres.InitiateModuleAndSchema(
+		// pg_connector.InitiateModuleAndSchema(
 		// 	"database",
 		// // schema.User{},
 		// // schema.ContactInfo{},
 		// // schema.EmergencyContact{},
 		// ),
-		jwt.InitiateModule("jwt", "jwt_auth", "jwt_email", "jwt_reset"),
+		jwt_manager.InitiateModule("jwt", "jwt_auth", "jwt_email", "jwt_reset"),
 		mailer.InitiateModule("mailer"),
 
 		//-- Internal Domains Start --
@@ -86,27 +82,6 @@ func main() {
 		// company.InitiateDomain("company"),
 
 		//-- Internal Domains End --
-
-		//manual testing of jwt module
-		fx.Invoke(func(jwt *jwt.Module) {
-			authToken, _ := jwt.GenerateToken("jwt_auth", jwtv5.MapClaims{"user_id": 11111})
-			emailToken, _ := jwt.GenerateToken("jwt_email", jwtv5.MapClaims{"user_id": 22222})
-
-			claims, err := jwt.ParseToken("jwt_auth", *authToken)
-			if err != nil {
-				log.Println(err)
-			} else {
-				log.Printf("claims: %v\n", claims)
-			}
-
-			claims, err = jwt.ParseToken("jwt_email", *emailToken)
-			if err != nil {
-				log.Println(err)
-			} else {
-				log.Printf("claims: %v\n", claims)
-			}
-
-		}),
 
 		fx.NopLogger,
 	)

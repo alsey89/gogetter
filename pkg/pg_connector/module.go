@@ -1,4 +1,4 @@
-package database
+package pg_connector
 
 import (
 	"context"
@@ -7,20 +7,20 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gorm_logger "gorm.io/gorm/logger"
 
-	"github.com/alsey89/gogetter/common"
+	"github.com/alsey89/gogetter/pkg/common"
 )
 
 const (
 	DefaultHost        = "0.0.0.0"
-	DefaultPort        = 3306
-	DefaultDbName      = "mysql"
-	DefaultUser        = "root"
+	DefaultPort        = 5432
+	DefaultDbName      = "postgres"
+	DefaultUser        = "postgres"
 	DefaultPassword    = "password"
-	DefaultSSLMode     = "true"
+	DefaultSSLMode     = "allow"
 	DefaultLogLevel    = "info"
 	DefaultAutoMigrate = false
 )
@@ -51,6 +51,8 @@ type Params struct {
 	Lifecycle fx.Lifecycle
 	Logger    *zap.Logger
 }
+
+// ---------------------------------------------------------
 
 func InitiateModuleAndSchema(scope string, schema ...interface{}) fx.Option {
 	return fx.Module(
@@ -83,6 +85,29 @@ func InitiateModuleAndSchema(scope string, schema ...interface{}) fx.Option {
 	)
 }
 
+func loadConfig(scope string) *Config {
+	//set default values
+	viper.SetDefault(common.GetConfigPath(scope, "host"), DefaultHost)
+	viper.SetDefault(common.GetConfigPath(scope, "port"), DefaultPort)
+	viper.SetDefault(common.GetConfigPath(scope, "dbname"), DefaultDbName)
+	viper.SetDefault(common.GetConfigPath(scope, "user"), DefaultUser)
+	viper.SetDefault(common.GetConfigPath(scope, "password"), DefaultPassword)
+	viper.SetDefault(common.GetConfigPath(scope, "sslmode"), DefaultSSLMode)
+	viper.SetDefault(common.GetConfigPath(scope, "log_level"), DefaultLogLevel)
+	viper.SetDefault(common.GetConfigPath(scope, "auto_migrate"), DefaultAutoMigrate)
+
+	return &Config{
+		Host:        viper.GetString(common.GetConfigPath(scope, "host")),
+		Port:        viper.GetInt(common.GetConfigPath(scope, "port")),
+		DBName:      viper.GetString(common.GetConfigPath(scope, "dbname")),
+		User:        viper.GetString(common.GetConfigPath(scope, "user")),
+		Password:    viper.GetString(common.GetConfigPath(scope, "password")),
+		SSLMode:     viper.GetString(common.GetConfigPath(scope, "sslmode")),
+		LogLevel:    viper.GetString(common.GetConfigPath(scope, "log_level")),
+		AutoMigrate: viper.GetBool(common.GetConfigPath(scope, "auto_migrate")),
+	}
+}
+
 func (m *Module) onStart(context.Context) error {
 	m.logger.Info("Database initiated")
 	if m.config.AutoMigrate {
@@ -105,36 +130,16 @@ func (m *Module) onStop(context.Context) error {
 		m.logger.Error("Error closing DB", zap.Error(err))
 	}
 
-	m.logger.Info("Database connection stopped")
+	m.logger.Info("Database module stopped")
 	return nil
 }
 
-func loadConfig(scope string) *Config {
-	viper.SetDefault(common.GetConfigPath(scope, "host"), DefaultHost)
-	viper.SetDefault(common.GetConfigPath(scope, "port"), DefaultPort)
-	viper.SetDefault(common.GetConfigPath(scope, "dbname"), DefaultDbName)
-	viper.SetDefault(common.GetConfigPath(scope, "user"), DefaultUser)
-	viper.SetDefault(common.GetConfigPath(scope, "password"), DefaultPassword)
-	viper.SetDefault(common.GetConfigPath(scope, "sslmode"), DefaultSSLMode)
-	viper.SetDefault(common.GetConfigPath(scope, "log_level"), DefaultLogLevel)
-	viper.SetDefault(common.GetConfigPath(scope, "auto_migrate"), DefaultAutoMigrate)
-
-	return &Config{
-		Host:        viper.GetString(common.GetConfigPath(scope, "host")),
-		Port:        viper.GetInt(common.GetConfigPath(scope, "port")),
-		DBName:      viper.GetString(common.GetConfigPath(scope, "dbname")),
-		User:        viper.GetString(common.GetConfigPath(scope, "user")),
-		Password:    viper.GetString(common.GetConfigPath(scope, "password")),
-		SSLMode:     viper.GetString(common.GetConfigPath(scope, "sslmode")),
-		LogLevel:    viper.GetString(common.GetConfigPath(scope, "log_level")),
-		AutoMigrate: viper.GetBool(common.GetConfigPath(scope, "auto_migrate")),
-	}
-}
+// ---------------------------------------------------------
 
 func (m *Module) setUpDBConnectionOrFatal() *gorm.DB {
 	dsn := m.getConnectionStringFromConfig()
 	loglevel := m.getLogLevelFromConfig()
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: gorm_logger.Default.LogMode(loglevel),
 	})
 	if err != nil {
@@ -145,8 +150,8 @@ func (m *Module) setUpDBConnectionOrFatal() *gorm.DB {
 }
 
 func (m *Module) getConnectionStringFromConfig() string {
-	return fmt.Sprintf("root:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		m.config.Password, m.config.Host, m.config.Port, m.config.DBName)
+	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		m.config.Host, m.config.Port, m.config.User, m.config.Password, m.config.DBName, m.config.SSLMode)
 }
 
 func (m *Module) getLogLevelFromConfig() gorm_logger.LogLevel {
@@ -182,7 +187,7 @@ func (m *Module) Migrate(schema ...interface{}) {
 	}
 }
 
-// GETTERS ---------------------------------------------------------
+// ---------------------------------------------------------
 func (m *Module) GetDB() *gorm.DB {
 	return m.db
 }
