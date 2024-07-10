@@ -32,7 +32,7 @@ echo_jwt:
   signing_method: "HS256"
   exp_in_hours: 72
 
-auth:
+auth_jwt:
   signing_key: "confirmationsecret"
   signing_method: "HS256"
   exp_in_hours: 1

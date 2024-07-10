@@ -10,20 +10,69 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// to be provided to the fx framework
 var logger *zap.Logger
 
+// default values
 const (
-	defaultLogLevel = zap.InfoLevel
+	DefaultSystemLogLevel = zap.InfoLevel
 )
 
-type Params struct {
-	fx.In
+//! MODULE ---------------------------------------------------------------
+
+// Provides the logger to the fx framework
+func InjectModule(scope string) fx.Option {
+	return fx.Options(
+		fx.Provide(setupLogger),
+	)
 }
 
-func InitiateModule() fx.Option {
-	return fx.Options(
-		fx.Provide(SetupLogger),
+// ! INTERNAL ---------------------------------------------------------------
+
+func setupLogger() *zap.Logger {
+	logLevel := setupLevel()
+	core := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(NewCustomEncoderConfig()),
+		zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout)),
+		logLevel,
 	)
+
+	if viper.GetString("system.system_log_level") == zap.DebugLevel.String() || viper.GetString("system.system_log_level") == zap.DebugLevel.CapitalString() {
+		logger = zap.New(core, zap.AddCaller(), zap.Development())
+	} else {
+		logger = zap.New(core)
+	}
+
+	zap.ReplaceGlobals(logger)
+
+	logger.Named("[logger]").Info(fmt.Sprintf("System log level is set to \"%s\"\n", logLevel.Level().CapitalString()))
+
+	return logger
+}
+
+func setupLevel() zap.AtomicLevel {
+	var logLevel zapcore.Level
+
+	switch viper.GetString("system.system_log_level") {
+	case zap.DebugLevel.String(), zap.DebugLevel.CapitalString():
+		logLevel = zap.DebugLevel
+	case zap.InfoLevel.String(), zap.InfoLevel.CapitalString():
+		logLevel = zap.InfoLevel
+	case zap.WarnLevel.String(), zap.WarnLevel.CapitalString():
+		logLevel = zap.WarnLevel
+	case zap.ErrorLevel.String(), zap.ErrorLevel.CapitalString():
+		logLevel = zap.ErrorLevel
+	case zap.DPanicLevel.String(), zap.DPanicLevel.CapitalString():
+		logLevel = zap.DPanicLevel
+	case zap.PanicLevel.String(), zap.PanicLevel.CapitalString():
+		logLevel = zap.PanicLevel
+	case zap.FatalLevel.String(), zap.FatalLevel.CapitalString():
+		logLevel = zap.FatalLevel
+	default:
+		logLevel = DefaultSystemLogLevel
+	}
+
+	return zap.NewAtomicLevelAt(logLevel)
 }
 
 func NewCustomEncoderConfig() zapcore.EncoderConfig {
@@ -41,56 +90,4 @@ func NewCustomEncoderConfig() zapcore.EncoderConfig {
 		EncodeDuration: zapcore.SecondsDurationEncoder,
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
-}
-
-func SetupLogger() *zap.Logger {
-	debugLevel := setupLevel()
-	core := zapcore.NewCore(
-		zapcore.NewConsoleEncoder(NewCustomEncoderConfig()),
-		zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout)),
-		debugLevel,
-	)
-
-	if os.Getenv("DEBUG_MODE") == "debug" {
-		logger.Info(fmt.Sprintf("Debug mode is set to \"%s\"\n", debugLevel.String()))
-		logger = zap.New(core, zap.AddCaller(), zap.Development())
-	} else {
-		logger = zap.New(core)
-	}
-
-	zap.ReplaceGlobals(logger)
-
-	logger.Named("[logger]").Info(fmt.Sprintf("Debug level is set to \"%s\"\n", debugLevel.String()))
-
-	return logger
-}
-
-func GetLogger() *zap.Logger {
-	return logger
-}
-
-func setupLevel() zap.AtomicLevel {
-
-	logLevel := defaultLogLevel
-
-	switch viper.GetString("system.loglevel") {
-	case zap.DebugLevel.String():
-		logLevel = zap.DebugLevel
-	case zap.InfoLevel.String():
-		logLevel = zap.InfoLevel
-	case zap.WarnLevel.String():
-		logLevel = zap.WarnLevel
-	case zap.ErrorLevel.String():
-		logLevel = zap.ErrorLevel
-	case zap.DPanicLevel.String():
-		logLevel = zap.DPanicLevel
-	case zap.PanicLevel.String():
-		logLevel = zap.PanicLevel
-	case zap.FatalLevel.String():
-		logLevel = zap.FatalLevel
-	default:
-		logLevel = defaultLogLevel
-	}
-
-	return zap.NewAtomicLevelAt(logLevel)
 }

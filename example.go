@@ -3,19 +3,17 @@ package main
 import (
 	"go.uber.org/fx"
 
-	"github.com/alsey89/gogetter/pkg/config_manager"
-	"github.com/alsey89/gogetter/pkg/jwt_manager"
+	"github.com/alsey89/gogetter/pkg/config"
 	"github.com/alsey89/gogetter/pkg/logger"
 	"github.com/alsey89/gogetter/pkg/mailer"
 	"github.com/alsey89/gogetter/pkg/server"
+	"github.com/alsey89/gogetter/pkg/token"
 )
-
-var config *config_manager.Module
 
 func init() {
 	//! CONFIG PRECEDENCE: ENV > CONFIG FILE > FALLBACK
-	config_manager.SetSystemLogLevel("debug")
-	config = config_manager.SetUpConfig("SERVER", "yaml")
+	config.SetSystemLogLevel("DEBUG")
+	config.SetUpConfig("SERVER", "yaml", "./")
 	config.SetFallbackConfigs(map[string]interface{}{
 		"server.host":      "0.0.0.0",
 		"server.port":      3001,
@@ -38,14 +36,12 @@ func init() {
 		"databse.loglevel":      "error",
 		"database.auto_migrate": false,
 
-		// Mailer
 		"mailer.host":         "smtp.gmail.com",
 		"mailer.port":         587,
 		"mailer.username":     "example@example-gmail.com",
 		"mailer.app_password": "foo bar baz qux",
 		"mailer.tls":          true,
 
-		// JWT Manager
 		"jwt_auth.signing_key":    "authsecret",
 		"jwt_auth.token_lookup":   "cookie:jwt",
 		"jwt_auth.signing_method": "HS256",
@@ -64,17 +60,16 @@ func init() {
 }
 func main() {
 	app := fx.New(
-		fx.Supply(config),
-		logger.InitiateModule(),
-		server.InitiateModule("server"),
-		// pg_connector.InitiateModuleAndSchema(
+		logger.InjectModule("logger"),
+		server.InjectModule("server"),
+		// pgconn.InitiateModuleAndSchema(
 		// 	"database",
 		// // schema.User{},
 		// // schema.ContactInfo{},
 		// // schema.EmergencyContact{},
 		// ),
-		jwt_manager.InitiateModule("jwt", "jwt_auth", "jwt_email", "jwt_reset"),
-		mailer.InitiateModule("mailer"),
+		token.InjectModule("jwt", "jwt_auth", "jwt_email", "jwt_reset"),
+		mailer.InjectModule("mailer", false),
 
 		//-- Internal Domains Start --
 

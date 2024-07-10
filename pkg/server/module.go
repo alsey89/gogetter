@@ -14,36 +14,12 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
-	"github.com/alsey89/gogetter/pkg/common"
+	"github.com/alsey89/gogetter/pkg/util"
 )
 
-const (
-	//server
-	DefaultHost     = "0.0.0.0"
-	DefaultLogLevel = "DEV"
-	DefaultPort     = 3001
-	//csrf middleware
-	DefaultCSRFProtection = false
-	DefaultCSRFSecure     = false
-	DefaultCSRFDomain     = "localhost"
-	//jwt middleware
-	DefaultSigningKey    = "secret"
-	DefaultTokenLookup   = "cookie:jwt"
-	DefaultSigningMethod = "HS256"
-)
+//! ??? ----------------------------------------------------------------
 
-type Config struct {
-	AllowHeaders   string
-	AllowMethods   string
-	AllowOrigins   string
-	CSRFProtection bool
-	CSRFSecure     bool
-	CSRFDomain     string
-	Host           string
-	LogLevel       string
-	Port           int
-}
-
+// to be provided to the fx framework
 type Module struct {
 	config *Config
 	logger *zap.Logger
@@ -51,82 +27,124 @@ type Module struct {
 	server *echo.Echo
 }
 
+// injected through the fx framework
 type Params struct {
 	fx.In
-
 	Lifecycle fx.Lifecycle
 	Logger    *zap.Logger
 }
 
-func InitiateModule(scope string) fx.Option {
+// holds configurations for the module
+type Config struct {
+	AllowHeaders string
+	AllowMethods string
+	AllowOrigins string
+
+	CSRFProtection bool
+	CSRFSecure     bool
+	CSRFDomain     string
+
+	Host           string
+	Port           int
+	ServerLogLevel string
+}
+
+// default values
+const (
+	DefaultAllowHeaders = "Accept, Content-Type, Content-Length, Accept-Encoding, Authorization, X-CSRF-Token, X-Requested-With, Origin, Cache-Control, Pragma, Expires, Set-Cookie, Cookie, jwt"
+	DefaultAllowMethods = "GET, PUT, POST, DELETE, OPTIONS, PATCH"
+	DefaultAllowOrigins = "*"
+
+	DefaultCSRFProtection = false
+	DefaultCSRFSecure     = false
+	DefaultCSRFDomain     = "localhost"
+
+	DefaultHost           = "localhost"
+	DefaultPort           = 3001
+	DefaultServerLogLevel = "PROD"
+)
+
+//! MODULE ---------------------------------------------------------------
+
+// Provides the Module struct to the fx framework, and registers lifecycle hooks.
+func InjectModule(scope string) fx.Option {
 	return fx.Module(
 		scope,
 		fx.Provide(func(p Params) *Module {
-			logger := p.Logger.Named("[" + scope + "]")
-			server := echo.New()
-			config := loadConfig(scope)
 
 			m := &Module{
-				logger: logger,
-				scope:  scope,
-
-				config: config,
-				server: server,
+				scope: scope,
 			}
+			m.config = m.setupConfig(scope)
+			m.logger = m.setupLogger(scope, p)
+			m.server = m.setupServer()
 
 			return m
 		}),
 		fx.Invoke(func(m *Module, p Params) {
-			p.Lifecycle.Append(
-				fx.Hook{
-					OnStart: m.onStart,
-					OnStop:  m.onStop,
-				},
-			)
+			p.Lifecycle.Append(fx.Hook{
+				OnStart: m.onStart,
+				OnStop:  m.onStop,
+			})
 		}),
 	)
 }
 
-func loadConfig(scope string) *Config {
-	//set defaults
-	viper.SetDefault(common.GetConfigPath(scope, "allow_headers"), "Accept, Content-Type, Content-Length, Accept-Encoding, Authorization, X-CSRF-Token, X-Requested-With, Origin, Cache-Control, Pragma, Expires, Set-Cookie, Cookie, jwt")
-	viper.SetDefault(common.GetConfigPath(scope, "allow_methods"), "GET,PUT,POST,DELETE, OPTIONS, PATCH")
-	viper.SetDefault(common.GetConfigPath(scope, "allow_origins"), "*")
+// ! INTERNAL ---------------------------------------------------------------
 
-	viper.SetDefault(common.GetConfigPath(scope, "csrf_protection"), DefaultCSRFProtection)
-	viper.SetDefault(common.GetConfigPath(scope, "csrf_secure"), DefaultCSRFSecure)
-	viper.SetDefault(common.GetConfigPath(scope, "csrf_domain"), DefaultCSRFDomain)
+func (m *Module) setupConfig(scope string) *Config {
+	// searches for pattern: "scope.key"
+	viper.SetDefault(util.GetConfigPath(scope, "allow_headers"), DefaultAllowHeaders)
+	viper.SetDefault(util.GetConfigPath(scope, "allow_methods"), DefaultAllowMethods)
+	viper.SetDefault(util.GetConfigPath(scope, "allow_origins"), DefaultAllowOrigins)
 
-	viper.SetDefault(common.GetConfigPath(scope, "host"), DefaultHost)
-	viper.SetDefault(common.GetConfigPath(scope, "log_level"), DefaultLogLevel)
-	viper.SetDefault(common.GetConfigPath(scope, "port"), DefaultPort)
+	viper.SetDefault(util.GetConfigPath(scope, "csrf_protection"), DefaultCSRFProtection)
+	viper.SetDefault(util.GetConfigPath(scope, "csrf_secure"), DefaultCSRFSecure)
+	viper.SetDefault(util.GetConfigPath(scope, "csrf_domain"), DefaultCSRFDomain)
+
+	viper.SetDefault(util.GetConfigPath(scope, "host"), DefaultHost)
+	viper.SetDefault(util.GetConfigPath(scope, "port"), DefaultPort)
+	viper.SetDefault(util.GetConfigPath(scope, "server_log_level"), DefaultServerLogLevel)
 
 	return &Config{
-		AllowHeaders: viper.GetString(common.GetConfigPath(scope, "allow_headers")),
-		AllowMethods: viper.GetString(common.GetConfigPath(scope, "allow_methods")),
-		AllowOrigins: viper.GetString(common.GetConfigPath(scope, "allow_origins")),
+		AllowHeaders: viper.GetString(util.GetConfigPath(scope, "allow_headers")),
+		AllowMethods: viper.GetString(util.GetConfigPath(scope, "allow_methods")),
+		AllowOrigins: viper.GetString(util.GetConfigPath(scope, "allow_origins")),
 
-		CSRFProtection: viper.GetBool(common.GetConfigPath(scope, "csrf_protection")),
-		CSRFSecure:     viper.GetBool(common.GetConfigPath(scope, "csrf_secure")),
-		CSRFDomain:     viper.GetString(common.GetConfigPath(scope, "csrf_domain")),
+		CSRFProtection: viper.GetBool(util.GetConfigPath(scope, "csrf_protection")),
+		CSRFSecure:     viper.GetBool(util.GetConfigPath(scope, "csrf_secure")),
+		CSRFDomain:     viper.GetString(util.GetConfigPath(scope, "csrf_domain")),
 
-		Host:     viper.GetString(common.GetConfigPath(scope, "host")),
-		Port:     viper.GetInt(common.GetConfigPath(scope, "port")),
-		LogLevel: viper.GetString(common.GetConfigPath(scope, "log_level")),
+		Host:           viper.GetString(util.GetConfigPath(scope, "host")),
+		Port:           viper.GetInt(util.GetConfigPath(scope, "port")),
+		ServerLogLevel: viper.GetString(util.GetConfigPath(scope, "server_log_level")),
 	}
 }
 
-func (m *Module) onStart(ctx context.Context) error {
-	m.logger.Info("Server Module initiated")
+func (m *Module) setupLogger(scope string, p Params) *zap.Logger {
+	logger := p.Logger.Named("[" + scope + "]")
+	return logger
+}
 
-	// middlewares
+func (m *Module) setupServer() *echo.Echo {
+	e := echo.New()
+	return e
+}
+
+func (m *Module) onStart(context.Context) error {
+	m.logger.Info("Starting server")
+
 	m.setUpCorsMiddleware()
 	m.setUpCSRFMiddleware()
 	m.setUpRequestLoggerMiddleware()
-	// server
-	go m.startServer(true, true)
 
-	m.PrintDebugLogs()
+	// server must be started in a goroutine to prevent blocking the hooks
+	// context will timeout otherwise
+	go m.startServer(true, false)
+
+	if viper.GetString("system.system_log_level") == "DEBUG" {
+		m.logConfigurations()
+	}
 
 	return nil
 }
@@ -144,30 +162,14 @@ func (m *Module) onStop(context.Context) error {
 	return nil
 }
 
-func (m *Module) setUpCSRFMiddleware() {
-	if !m.config.CSRFProtection {
-		return
-	}
-
-	csrfConfig := middleware.CSRFConfig{
-		TokenLookup:    "cookie:_csrf",
-		CookiePath:     "/",
-		CookieDomain:   m.config.CSRFDomain,
-		CookieSecure:   m.config.CSRFSecure,
-		CookieSameSite: http.SameSiteLaxMode,
-		CookieHTTPOnly: true,
-	}
-	m.server.Use(middleware.CSRFWithConfig(csrfConfig))
-}
-
 func (m *Module) setUpCorsMiddleware() {
-	// configure CORS middleware
 	corsConfig := middleware.CORSConfig{
 		AllowOrigins:     strings.Split(m.config.AllowOrigins, ","),
 		AllowMethods:     strings.Split(m.config.AllowMethods, ","),
 		AllowHeaders:     strings.Split(m.config.AllowHeaders, ","),
 		AllowCredentials: true,
 	}
+	//* defaults to allow all origins, methods, and headers if unspecified
 	if m.config.AllowOrigins == "" || m.config.AllowOrigins == "*" {
 		corsConfig.AllowOrigins = []string{"*"}
 	}
@@ -177,70 +179,87 @@ func (m *Module) setUpCorsMiddleware() {
 	if m.config.AllowHeaders == "" || m.config.AllowHeaders == "*" {
 		corsConfig.AllowHeaders = []string{"accept", "content-type", "authorization", "x-csrf-token", "x-requested-with", "origin", "cache-control", "pragma", "expires", "set-cookie", "cookie", "jwt"}
 	}
-	// add CORS middleware
+
 	m.server.Use(middleware.CORSWithConfig(corsConfig))
 }
 
-func (m *Module) setUpRequestLoggerMiddleware() {
-
-	// configure request logger according to log level
-	requestLoggerConfig := middleware.RequestLoggerConfig{
-		LogProtocol:  true,
-		LogMethod:    true,
-		LogURI:       true,
-		LogStatus:    true,
-		LogRequestID: true,
-		LogRemoteIP:  true,
-		LogLatency:   true,
-		LogError:     true,
-		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			switch m.config.LogLevel {
-			case "DEV":
-				log.Printf("|--------------------------------------------\n")
-				m.logger.Info("request",
-					zap.String("URI", v.URI),
-					zap.String("method", v.Method),
-					zap.Int("status", v.Status),
-					zap.Any("error", v.Error),
-					zap.String("remote_ip", v.RemoteIP),
-					zap.String("request_id", v.RequestID),
-					zap.Duration("latency", v.Latency),
-					zap.String("protocol", v.Protocol),
-				)
-				log.Printf("--------------------------------------------|\n")
-			case "PROD":
-				log.Printf("|--------------------------------------------\n")
-				m.logger.Info("request",
-					zap.String("URI", v.URI),
-					zap.Int("status", v.Status),
-					zap.Any("error", v.Error),
-					zap.String("request_id", v.RequestID),
-					zap.Duration("latency", v.Latency),
-				)
-				log.Printf("--------------------------------------------|\n")
-			case "DEBUG":
-				log.Printf("|--------------------------------------------\n")
-				m.logger.Debug("request",
-					zap.String("URI", v.URI),
-					zap.String("method", v.Method),
-					zap.Int("status", v.Status),
-					zap.String("remote_ip", v.RemoteIP),
-					zap.String("request_id", v.RequestID),
-					zap.Duration("latency", v.Latency),
-					zap.String("protocol", v.Protocol),
-					zap.Any("error", v.Error),
-					zap.Any("request_body", c.Request().Body),
-					// todo: add more debug logs if needed
-				)
-				log.Printf("--------------------------------------------|\n")
-			default:
-				m.logger.Error("invalid log level", zap.String("log_level", m.config.LogLevel))
-			}
-			return nil
-		},
+func (m *Module) setUpCSRFMiddleware() {
+	// defaults to not using CSRF protection if unspecified
+	if !m.config.CSRFProtection {
+		return
 	}
-	// add request logger middleware
-	m.server.Use(middleware.RequestLoggerWithConfig(requestLoggerConfig))
+	CSRFConfig := middleware.CSRFConfig{
+		TokenLookup:    "cookie:_csrf",
+		CookiePath:     "/",
+		CookieDomain:   m.config.CSRFDomain,
+		CookieSecure:   m.config.CSRFSecure,
+		CookieSameSite: http.SameSiteDefaultMode,
+		CookieHTTPOnly: true,
+	}
+	CSRFMiddleware := middleware.CSRFWithConfig(CSRFConfig)
+
+	m.server.Use(CSRFMiddleware)
+}
+
+func (m *Module) setUpRequestLoggerMiddleware() {
+	// Defaults to PROD log level if unspecified
+	// Valid log levels: DEV, PROD, DEBUG
+	requestLoggerConfig := middleware.RequestLoggerConfig{
+		LogProtocol:   true,
+		LogMethod:     true,
+		LogURI:        true,
+		LogStatus:     true,
+		LogRequestID:  true,
+		LogRemoteIP:   true,
+		LogLatency:    true,
+		LogError:      true,
+		LogValuesFunc: m.logRequest,
+	}
+	requestLogger := middleware.RequestLoggerWithConfig(requestLoggerConfig)
+
+	m.server.Use(requestLogger)
+}
+
+// helper function for setUpRequestLoggerMiddleware
+func (m *Module) logRequest(c echo.Context, v middleware.RequestLoggerValues) error {
+	switch m.config.ServerLogLevel {
+	case "DEV", "dev":
+		m.logger.Info("request",
+			zap.String("URI", v.URI),
+			zap.String("method", v.Method),
+			zap.Int("status", v.Status),
+			zap.Any("error", v.Error),
+			zap.String("remote_ip", v.RemoteIP),
+			zap.String("request_id", v.RequestID),
+			zap.Duration("latency", v.Latency),
+			zap.String("protocol", v.Protocol),
+		)
+	case "PROD", "prod":
+		m.logger.Info("request",
+			zap.String("URI", v.URI),
+			zap.Int("status", v.Status),
+			zap.Any("error", v.Error),
+			zap.String("request_id", v.RequestID),
+			zap.Duration("latency", v.Latency),
+		)
+	case "DEBUG", "debug":
+		m.logger.Debug("request",
+			zap.String("URI", v.URI),
+			zap.String("method", v.Method),
+			zap.Int("status", v.Status),
+			zap.String("remote_ip", v.RemoteIP),
+			zap.String("request_id", v.RequestID),
+			zap.Duration("latency", v.Latency),
+			zap.String("protocol", v.Protocol),
+			zap.Any("error", v.Error),
+			//todo: add more as needed
+		)
+	default:
+		m.logger.Error("invalid log level", zap.String("log_level", m.config.ServerLogLevel))
+		return fmt.Errorf("invalid log level: %s", m.config.ServerLogLevel)
+	}
+
+	return nil
 }
 
 func (m *Module) startServer(HideBanner bool, HidePort bool) {
@@ -248,30 +267,25 @@ func (m *Module) startServer(HideBanner bool, HidePort bool) {
 	m.server.HidePort = HidePort || false
 
 	addr := fmt.Sprintf("%s:%d", m.config.Host, m.config.Port)
+
+	log.Printf("Server started at %s", addr)
+
 	err := m.server.Start(addr)
 	if err != nil && err != http.ErrServerClosed {
 		m.logger.Fatal(err.Error())
 	}
 }
 
-// ----------------------------------------------------------
-
-func (m *Module) GetServer() *echo.Echo {
-	return m.server
-}
-
-func (m *Module) PrintDebugLogs() {
-	//* Debug Logs
-	//server
+func (m *Module) logConfigurations() {
 	m.logger.Debug("----- Server Configuration -----")
 	m.logger.Debug("Host", zap.String("Host", m.config.Host))
 	m.logger.Debug("Port", zap.Int("Port", m.config.Port))
-	//cors
+
 	m.logger.Debug("----- Cors Configuration -----")
 	m.logger.Debug("AllowOrigins", zap.String("AllowOrigins", m.config.AllowOrigins))
 	m.logger.Debug("AllowMethods", zap.String("AllowMethods", m.config.AllowMethods))
 	m.logger.Debug("AllowHeaders", zap.String("AllowHeaders", m.config.AllowHeaders))
-	//csrf
+
 	m.logger.Debug("----- CSRF Configuration -----")
 	m.logger.Debug("CSRFProtection", zap.Bool("CSRFProtection", m.config.CSRFProtection))
 	if m.config.CSRFProtection {
@@ -279,6 +293,14 @@ func (m *Module) PrintDebugLogs() {
 		m.logger.Debug("CSRFCookiePath", zap.String("CSRFCookiePath", "/"))
 		m.logger.Debug("CSRFCookieDomain", zap.String("CSRFCookieDomain", m.config.CSRFDomain))
 		m.logger.Debug("CSRFCookieSecure", zap.Bool("CSRFCookieSecure", m.config.CSRFSecure))
+		m.logger.Debug("CSRFCookieSameSite", zap.String("CSRFCookieSameSite", "Default"))
 		m.logger.Debug("CSRFCookieHTTPOnly", zap.Bool("CSRFCookieHTTPOnly", true))
 	}
+}
+
+//! EXTERNAL ---------------------------------------------------------------
+
+// Returns the echo server instance
+func (m *Module) GetServer() *echo.Echo {
+	return m.server
 }

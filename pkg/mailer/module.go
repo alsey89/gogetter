@@ -8,29 +8,8 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/gomail.v2"
 
-	"github.com/alsey89/gogetter/pkg/common"
+	"github.com/alsey89/gogetter/pkg/util"
 )
-
-const (
-	DefaultHost        = "0.0.0.0"
-	DefaultPort        = 25
-	DefaultUsername    = ""
-	DefaultAppPassword = ""
-	DefaultTLS         = false
-
-	DefaultSubject = "From Gogetter Mail Module"
-	DefaultBody    = "This is an email from Gogetter Mail Module."
-	DefaultFrom    = "mail@gogetter.com"
-	DefaultTo      = "mail@gogetter.com"
-)
-
-type Config struct {
-	Host        string
-	Port        int
-	Username    string
-	AppPassword string //! Important: Use app password, not the account password.
-	TLS         bool
-}
 
 type Module struct {
 	logger *zap.Logger
@@ -47,88 +26,109 @@ type Params struct {
 	Logger    *zap.Logger
 }
 
-func InitiateModule(scope string) fx.Option {
+type Config struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+	TLS      bool
+}
 
-	var m *Module
+const (
+	DefaultHost     = "0.0.0.0"
+	DefaultPort     = 25
+	DefaultUsername = ""
+	DefaultPassword = ""
+	DefaultTLS      = false
 
+	DefaultSubject = "From Gogetter Mail Module"
+	DefaultBody    = "This is an email from Gogetter Mail Module."
+	DefaultFrom    = "mail@gogetter.com"
+	DefaultTo      = "mail@gogetter.com"
+)
+
+//! MODULE ----------------------------------------------------------
+
+// provides Mailer
+func InjectModule(scope string, connectOrFatal bool) fx.Option {
 	return fx.Module(
 		scope,
 		fx.Provide(func(p Params) *Module {
-			logger := p.Logger.Named("[" + scope + "]")
-			config := loadConfig(scope)
-			dialer := gomail.NewDialer(config.Host, config.Port, config.Username, config.AppPassword)
+			m := &Module{scope: scope}
 
-			m := &Module{
-				logger: logger,
-				config: config,
-				scope:  scope,
-				dialer: dialer,
-			}
+			m.logger = m.setupLogger(scope, p)
+			m.config = m.setupConfig(scope)
+			m.dialer = m.setupMailer()
 
 			return m
 		}),
-		fx.Populate(&m),
-		fx.Invoke(func(p Params) *Module {
-
+		fx.Invoke(func(m *Module, p Params) {
 			p.Lifecycle.Append(
 				fx.Hook{
 					OnStart: m.onStart,
 					OnStop:  m.onStop,
 				},
 			)
-
-			return m
 		}),
 	)
 }
 
-func loadConfig(scope string) *Config {
+func (m *Module) setupLogger(scope string, p Params) *zap.Logger {
+	logger := p.Logger.Named("[" + scope + "]")
 
+	return logger
+}
+
+func (m *Module) setupConfig(scope string) *Config {
 	//set defaults
-	viper.SetDefault(common.GetConfigPath(scope, "host"), DefaultHost)
-	viper.SetDefault(common.GetConfigPath(scope, "port"), DefaultPort)
-	viper.SetDefault(common.GetConfigPath(scope, "username"), DefaultUsername)
-	viper.SetDefault(common.GetConfigPath(scope, "password"), DefaultAppPassword)
-	viper.SetDefault(common.GetConfigPath(scope, "tls"), DefaultTLS)
+	viper.SetDefault(util.GetConfigPath(scope, "host"), DefaultHost)
+	viper.SetDefault(util.GetConfigPath(scope, "port"), DefaultPort)
+	viper.SetDefault(util.GetConfigPath(scope, "username"), DefaultUsername)
+	viper.SetDefault(util.GetConfigPath(scope, "password"), DefaultPassword)
+	viper.SetDefault(util.GetConfigPath(scope, "tls"), DefaultTLS)
 	//populate config
 	return &Config{
-		Host:        viper.GetString(common.GetConfigPath(scope, "host")),
-		Port:        viper.GetInt(common.GetConfigPath(scope, "port")),
-		Username:    viper.GetString(common.GetConfigPath(scope, "username")),
-		AppPassword: viper.GetString(common.GetConfigPath(scope, "app_password")),
-		TLS:         viper.GetBool(common.GetConfigPath(scope, "tls")),
+		Host:     viper.GetString(util.GetConfigPath(scope, "host")),
+		Port:     viper.GetInt(util.GetConfigPath(scope, "port")),
+		Username: viper.GetString(util.GetConfigPath(scope, "username")),
+		Password: viper.GetString(util.GetConfigPath(scope, "password")),
+		TLS:      viper.GetBool(util.GetConfigPath(scope, "tls")),
 	}
 }
 
+func (m *Module) setupMailer() *gomail.Dialer {
+	dialer := gomail.NewDialer(
+		m.config.Host,
+		m.config.Port,
+		m.config.Username,
+		m.config.Password,
+	)
+
+	return dialer
+}
+
 func (m *Module) onStart(ctx context.Context) error {
-	m.logger.Info("Mailer initiated")
+	m.logger.Info("Starting mailer module.")
 
-	err := m.testSMTPConnection()
-	if err != nil {
-		m.logger.Error("Failed to connect to the SMTP server", zap.Error(err))
+	if viper.GetString("system.system_log_level") == "DEBUG" || viper.GetString("system.system_log_level") == "debug" {
+		m.logConfigurations()
 	}
-
-	m.printDebugLogs()
 
 	return nil
 }
 
 func (m *Module) onStop(ctx context.Context) error {
-
-	m.logger.Info("Mailer module stopped")
+	m.logger.Info("Stopping mailer module.")
 
 	return nil
 }
 
-// ----------------------------------------------------------
-
-func (m *Module) printDebugLogs() {
-	//* Debug logs
+func (m *Module) logConfigurations() {
 	m.logger.Debug("----- Mailer Configuration -----")
 	m.logger.Debug("Host", zap.String("Host", m.config.Host))
 	m.logger.Debug("Port", zap.Int("Port", m.config.Port))
 	m.logger.Debug("Username", zap.String("Username", m.config.Username))
-	m.logger.Debug("AppPassword", zap.String("AppPassword", m.config.AppPassword))
+	m.logger.Debug("Password", zap.String("Password", m.config.Password))
 	m.logger.Debug("TLS", zap.Bool("TLS", m.config.TLS))
 }
 
@@ -145,34 +145,22 @@ func (m *Module) testSMTPConnection() error {
 	return nil
 }
 
-func (m *Module) SendTestMail(to, subject, body string) error {
-	msg := m.NewMessage()
-	msg.SetHeader("From", DefaultFrom)
-	msg.SetHeader("To", to)
-	msg.SetHeader("Subject", subject)
-	msg.SetBody("text/html", body)
+//! EXTERNAL ----------------------------------------------------------
 
-	err := m.Send(msg)
-	if err != nil {
-		m.logger.Error("Failed to send test email", zap.Error(err))
-		return err
-	}
-
-	m.logger.Info("Test email sent successfully.")
-	return nil
-}
-
-// ----------------------------------------------------------
-
+// Creates a new email message
+// Set details on the message and send using SendMail method
 func (m *Module) NewMessage() *gomail.Message {
 	return gomail.NewMessage()
 }
 
-func (m *Module) Send(msg *gomail.Message) error {
+// Sends the email message
+// Create the message using NewMessage method
+func (m *Module) SendMail(msg *gomail.Message) error {
 	return m.dialer.DialAndSend(msg)
 }
 
-// creates and sends email
+// Single method to create and send email
+// Can be used instead of NewMessage and SendMail methods
 func (m *Module) SendTransactionalMail(from string, to string, subject string, body string) error {
 	msg := gomail.NewMessage()
 	msg.SetHeader("From", from)

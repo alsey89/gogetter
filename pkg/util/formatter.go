@@ -1,6 +1,8 @@
-package common
+package util
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // GetConfigPath returns scope.key in string format
 func GetConfigPath(scope string, key string) string {
