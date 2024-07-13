@@ -69,6 +69,17 @@ func InjectModule(moduleScope string, tokenScopes ...string) fx.Option {
 	)
 }
 
+// Instantiate the Module without using the fx framework
+func NewTokenManager(moduleScope string, logger *zap.Logger, tokenScopes ...string) *Module {
+	m := &Module{scope: moduleScope}
+	m.logger = logger.Named("[" + moduleScope + "]")
+	m.configs = m.setupConfig(tokenScopes...)
+
+	m.onStart(context.Background())
+
+	return m
+}
+
 //! INTERNAL ---------------------------------------------------------------
 
 func (m *Module) setupLogger(moduleScope string, p Params) *zap.Logger {
@@ -120,7 +131,7 @@ func (m *Module) onStop(ctx context.Context) error {
 
 func (m *Module) logConfigurations() {
 	for scope, config := range m.configs {
-		m.logger.Debug("----- JWT Module Configuration -----")
+		m.logger.Debug("----- Token Manager Configuration -----")
 		m.logger.Debug("TokenScope", zap.String("TokenScope", scope))
 		m.logger.Debug("TokenLookup", zap.String("TokenLookup", config.TokenLookup))
 		m.logger.Debug("SigningKey", zap.String("SigningKey", config.SigningKey))

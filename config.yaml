@@ -10,14 +10,14 @@ server:
   csrf_domain: "localhost"
 
 database:
-  host: "postgres"
+  host: "localhost" #todo: use postgres in docker-compose setup
   port: 5432
   dbname: "postgres"
   user: "postgres"
   password: "password"
   sslmode: "prefer"
   loglevel: "error"
-  auto_migrate: false
+  auto_migrate: true
 
 mailer:
   host: "smtp.gmail.com"

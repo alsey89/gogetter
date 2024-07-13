@@ -1,14 +1,26 @@
 package main
 
 import (
-	"go.uber.org/fx"
-
 	"github.com/alsey89/gogetter/pkg/config"
 	"github.com/alsey89/gogetter/pkg/logger"
 	"github.com/alsey89/gogetter/pkg/mailer"
+	"github.com/alsey89/gogetter/pkg/pgconn"
 	"github.com/alsey89/gogetter/pkg/server"
 	"github.com/alsey89/gogetter/pkg/token"
+	"go.uber.org/fx"
 )
+
+type User struct {
+	ID   int
+	Name string
+}
+
+type ContactInfo struct {
+	ID     int
+	UserID int
+	Email  string
+	Phone  string
+}
 
 func init() {
 	//! CONFIG PRECEDENCE: ENV > CONFIG FILE > FALLBACK
@@ -16,7 +28,7 @@ func init() {
 	config.SetUpConfig("SERVER", "yaml", "./")
 	config.SetFallbackConfigs(map[string]interface{}{
 		"server.host":      "0.0.0.0",
-		"server.port":      3001,
+		"server.port":      5001,
 		"server.log_level": "DEV",
 
 		"server.allow_headers":   "*",
@@ -35,6 +47,10 @@ func init() {
 		"database.sslmode":      "prefer",
 		"databse.loglevel":      "error",
 		"database.auto_migrate": false,
+		"database.schema": []interface{}{
+			User{},
+			ContactInfo{},
+		},
 
 		"mailer.host":         "smtp.gmail.com",
 		"mailer.port":         587,
@@ -58,26 +74,45 @@ func init() {
 		"jwt_reset.exp_in_hours":   1,
 	})
 }
+
+// example without fx framework
+// use the "NewModule" functions to instantiate the modules
+// func main() {
+// 	logger := logger.NewLogger()
+// 	database := pgconn.NewPGConn("database", logger)
+// 	database.ApplySchema(
+// 		false,
+// 		User{},
+// 		ContactInfo{},
+// 	)
+// 	jwt := token.NewTokenManager("jwt", logger, "jwt_auth", "jwt_email", "jwt_reset")
+// 	mailer := mailer.NewMailer("mailer", logger)
+// 	server := server.NewServer("server", logger)
+
+// 	log.Print(jwt, database, mailer, server)
+// }
+
+// example with fx framework
+// use the "InjectModule" functions to inject the modules
 func main() {
 	app := fx.New(
+		//* Modules ---------------------------------------------------------------
 		logger.InjectModule("logger"),
-		server.InjectModule("server"),
-		// pgconn.InitiateModuleAndSchema(
-		// 	"database",
-		// // schema.User{},
-		// // schema.ContactInfo{},
-		// // schema.EmergencyContact{},
-		// ),
+		pgconn.InjectModule("database"),
 		token.InjectModule("jwt", "jwt_auth", "jwt_email", "jwt_reset"),
 		mailer.InjectModule("mailer", false),
+		server.InjectModule("server"),
+		//* Domains ---------------------------------------------------------------
 
-		//-- Internal Domains Start --
-
-		// auth.InitiateDomain("auth"),
-		// company.InitiateDomain("company"),
-
-		//-- Internal Domains End --
-
+		//* Migration -------------------------------------------------------------
+		fx.Invoke(func(m *pgconn.Module) {
+			m.ApplySchema(
+				true,
+				User{},
+				ContactInfo{},
+			)
+		}),
+		//* fx logs ---------------------------------------------------------------
 		fx.NopLogger,
 	)
 	app.Run()

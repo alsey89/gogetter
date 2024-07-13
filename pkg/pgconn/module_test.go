@@ -27,7 +27,6 @@ func TestSetupConfig(t *testing.T) {
 		assert.Equal(t, DefaultPassword, m.config.Password)
 		assert.Equal(t, DefaultSSLMode, m.config.SSLMode)
 		assert.Equal(t, DefaultLogLevel, m.config.LogLevel)
-		assert.Equal(t, DefaultAutoMigrate, m.config.AutoMigrate)
 	})
 
 	t.Run("TestSetupWithConfig", func(t *testing.T) {
@@ -52,7 +51,6 @@ func TestSetupConfig(t *testing.T) {
 		assert.Equal(t, "password_test", m.config.Password)
 		assert.Equal(t, "false", m.config.SSLMode)
 		assert.Equal(t, "error", m.config.LogLevel)
-		assert.Equal(t, true, m.config.AutoMigrate)
 	})
 
 	t.Run("TestSetupWithPartialConfig", func(t *testing.T) {
@@ -71,7 +69,6 @@ func TestSetupConfig(t *testing.T) {
 		assert.Equal(t, DefaultPassword, m.config.Password)
 		assert.Equal(t, DefaultSSLMode, m.config.SSLMode)
 		assert.Equal(t, DefaultLogLevel, m.config.LogLevel)
-		assert.Equal(t, DefaultAutoMigrate, m.config.AutoMigrate)
 	})
 }
 

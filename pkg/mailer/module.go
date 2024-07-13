@@ -73,6 +73,20 @@ func InjectModule(scope string, connectOrFatal bool) fx.Option {
 	)
 }
 
+// Instantiate the mailer without using the fx framework
+func NewMailer(scope string, logger *zap.Logger) *Module {
+	m := &Module{scope: scope}
+	m.logger = logger.Named("[" + scope + "]")
+	m.config = m.setupConfig(scope)
+	m.dialer = m.setupMailer()
+
+	m.onStart(context.Background())
+
+	return m
+}
+
+//! INTERNAL ----------------------------------------------------------
+
 func (m *Module) setupLogger(scope string, p Params) *zap.Logger {
 	logger := p.Logger.Named("[" + scope + "]")
 

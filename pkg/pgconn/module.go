@@ -18,7 +18,6 @@ type Module struct {
 	config *Config
 	db     *gorm.DB
 	logger *zap.Logger
-	schema []interface{}
 	scope  string
 }
 
@@ -30,25 +29,23 @@ type Params struct {
 }
 
 type Config struct {
-	AutoMigrate bool
-	DBName      string
-	Host        string
-	LogLevel    string
-	Password    string
-	Port        int
-	SSLMode     string
-	User        string
+	DBName   string
+	Host     string
+	LogLevel string
+	Password string
+	Port     int
+	SSLMode  string
+	User     string
 }
 
 const (
-	DefaultHost        = "0.0.0.0"
-	DefaultPort        = 5432
-	DefaultDbName      = "postgres"
-	DefaultUser        = "postgres"
-	DefaultPassword    = "password"
-	DefaultSSLMode     = "allow"
-	DefaultLogLevel    = "info"
-	DefaultAutoMigrate = false
+	DefaultHost     = "0.0.0.0"
+	DefaultPort     = 5432
+	DefaultDbName   = "postgres"
+	DefaultUser     = "postgres"
+	DefaultPassword = "password"
+	DefaultSSLMode  = "allow"
+	DefaultLogLevel = "info"
 )
 
 //! Module ---------------------------------------------------------------
@@ -56,13 +53,12 @@ const (
 // Provides Module to the fx framework, and reigsters Lifecyle hooks.
 // Accepts schema as a variadic parameter.
 // If auto_migrate is true, the schema will be migrated at startup.
-func InjectModuleAndSchema(scope string, schema ...interface{}) fx.Option {
+func InjectModule(scope string) fx.Option {
 	return fx.Module(
 		scope,
 		fx.Provide(func(p Params) *Module {
 
 			m := &Module{scope: scope}
-			m.schema = schema
 			m.config = m.setupConfig(scope)
 			m.logger = m.setupLogger(scope, p)
 			m.db = m.setUpDB()
@@ -80,6 +76,18 @@ func InjectModuleAndSchema(scope string, schema ...interface{}) fx.Option {
 	)
 }
 
+// Instantiates new Module without using the fx framework.
+func NewPGConn(scope string, logger *zap.Logger) *Module {
+	m := &Module{scope: scope}
+	m.logger = logger.Named("[" + scope + "]")
+	m.config = m.setupConfig(scope)
+	m.db = m.setUpDB()
+
+	m.onStart(context.Background())
+
+	return m
+}
+
 //! INTERNAL ---------------------------------------------------------------
 
 func (m *Module) setupConfig(scope string) *Config {
@@ -91,17 +99,15 @@ func (m *Module) setupConfig(scope string) *Config {
 	viper.SetDefault(util.GetConfigPath(scope, "password"), DefaultPassword)
 	viper.SetDefault(util.GetConfigPath(scope, "sslmode"), DefaultSSLMode)
 	viper.SetDefault(util.GetConfigPath(scope, "log_level"), DefaultLogLevel)
-	viper.SetDefault(util.GetConfigPath(scope, "auto_migrate"), DefaultAutoMigrate)
 
 	return &Config{
-		Host:        viper.GetString(util.GetConfigPath(scope, "host")),
-		Port:        viper.GetInt(util.GetConfigPath(scope, "port")),
-		DBName:      viper.GetString(util.GetConfigPath(scope, "dbname")),
-		User:        viper.GetString(util.GetConfigPath(scope, "user")),
-		Password:    viper.GetString(util.GetConfigPath(scope, "password")),
-		SSLMode:     viper.GetString(util.GetConfigPath(scope, "sslmode")),
-		LogLevel:    viper.GetString(util.GetConfigPath(scope, "log_level")),
-		AutoMigrate: viper.GetBool(util.GetConfigPath(scope, "auto_migrate")),
+		Host:     viper.GetString(util.GetConfigPath(scope, "host")),
+		Port:     viper.GetInt(util.GetConfigPath(scope, "port")),
+		DBName:   viper.GetString(util.GetConfigPath(scope, "dbname")),
+		User:     viper.GetString(util.GetConfigPath(scope, "user")),
+		Password: viper.GetString(util.GetConfigPath(scope, "password")),
+		SSLMode:  viper.GetString(util.GetConfigPath(scope, "sslmode")),
+		LogLevel: viper.GetString(util.GetConfigPath(scope, "log_level")),
 	}
 }
 
@@ -146,10 +152,6 @@ func (m *Module) getLogLevelFromConfig() gorm_logger.LogLevel {
 func (m *Module) onStart(context.Context) error {
 	m.logger.Info("Starting database connection.")
 
-	if m.config.AutoMigrate {
-		m.Migrate(m.schema...)
-	}
-
 	if viper.GetString("system.system_log_level") == "DEBUG" || viper.GetString("system.system_log_level") == "debug" {
 		m.logConfigurations()
 	}
@@ -174,14 +176,6 @@ func (m *Module) onStop(context.Context) error {
 	return nil
 }
 
-func (m *Module) Migrate(schema ...interface{}) {
-	m.logger.Info("Migrating database")
-	err := m.db.AutoMigrate(schema...)
-	if err != nil {
-		m.logger.Error("Error auto migrating database", zap.Error(err))
-	}
-}
-
 func (m *Module) logConfigurations() {
 	m.logger.Debug("----- Database Configuration -----")
 	m.logger.Debug("Host", zap.String("host", m.config.Host))
@@ -192,6 +186,23 @@ func (m *Module) logConfigurations() {
 }
 
 //! EXTERNAL ---------------------------------------------------------------
+
+// Applies the passed in schema.
+// If autoMigrate is true, it will automatically migrate the schema at startup.
+// If autoMigrate is false, it will skip the migration.
+func (m *Module) ApplySchema(autoMigrate bool, schema ...interface{}) {
+	if !autoMigrate {
+		m.logger.Info("Skipping auto migration.")
+		return
+	}
+	m.logger.Info("Migration started.")
+	err := m.db.AutoMigrate(schema...)
+	if err != nil {
+		m.logger.Error("Error with migration.", zap.Error(err))
+	}
+
+	m.logger.Info("Migration completed.")
+}
 
 // Returns the GORM DB instance
 func (m *Module) GetDB() *gorm.DB {

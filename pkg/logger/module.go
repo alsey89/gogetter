@@ -27,6 +27,11 @@ func InjectModule(scope string) fx.Option {
 	)
 }
 
+// Instantiate the logger without using the fx framework
+func NewLogger() *zap.Logger {
+	return setupLogger()
+}
+
 // ! INTERNAL ---------------------------------------------------------------
 
 func setupLogger() *zap.Logger {

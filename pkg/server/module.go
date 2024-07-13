@@ -90,6 +90,20 @@ func InjectModule(scope string) fx.Option {
 	)
 }
 
+// Instantiates new Module without using the fx framework.
+func NewServer(scope string, logger *zap.Logger) *Module {
+	m := &Module{
+		scope: scope,
+	}
+	m.logger = logger.Named("[" + scope + "]")
+	m.config = m.setupConfig(scope)
+	m.server = m.setupServer()
+
+	m.onStart(context.Background())
+
+	return m
+}
+
 // ! INTERNAL ---------------------------------------------------------------
 
 func (m *Module) setupConfig(scope string) *Config {
